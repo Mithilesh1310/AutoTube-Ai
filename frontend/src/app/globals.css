@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #fbfbfc;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+}
+
+body {
+  background-color: #fbfbfc;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+/* Polymer Ambient Curved Frame (Signature Polymer.co look) */
+.polymer-ambient-frame {
+  background: linear-gradient(135deg, #fce7f3 0%, #fae8ff 35%, #fed7aa 100%);
+  padding: 1.5rem;
+  border-radius: 2rem;
+  box-shadow: 0 20px 40px -15px rgba(244, 114, 182, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+@media (min-width: 768px) {
+  .polymer-ambient-frame {
+    padding: 2rem;
+    border-radius: 2.25rem;
+  }
+}
+
+/* Polymer Pure White Card */
+.polymer-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+.polymer-card-hover {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.polymer-card-hover:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+/* Polymer Solid Black Button */
+.btn-polymer-black {
+  background-color: #111827;
+  color: #ffffff;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn-polymer-black:hover {
+  background-color: #000000;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.15);
+}
+
+/* Polymer Pastel Accent Badges */
+.badge-pastel-rose {
+  background-color: #fdf2f8;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+}
+.badge-pastel-peach {
+  background-color: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+.badge-pastel-emerald {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.badge-pastel-blue {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+/* Clean Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #fbfbfc;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
