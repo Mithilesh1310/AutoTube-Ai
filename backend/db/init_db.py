@@ -1,6 +1,7 @@
 import asyncio
 from sqlalchemy import select
 from backend.db.session import engine, AsyncSessionLocal, Base
+import backend.db.models
 from backend.db.models import Character, Setting, User, YouTubeChannel, ChannelAutomationProfile
 from backend.config import settings
 
@@ -108,6 +109,8 @@ INITIAL_SETTINGS = [
 from sqlalchemy import text
 
 async def _migrate_sqlite_columns(conn):
+    if conn.dialect.name != "sqlite":
+        return
     def sync_migrate(sync_conn):
         migrations = [
             ("users", "is_active", "BOOLEAN DEFAULT 1"),
