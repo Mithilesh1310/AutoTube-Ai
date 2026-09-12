@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from sqlalchemy import select, func
 from backend.db.session import AsyncSessionLocal
 from backend.db.models import User, UsageLedger
