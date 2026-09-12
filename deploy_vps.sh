@@ -27,6 +27,7 @@ fi
 # 3. Configure Firewall (Allow Ports 80, 443, 22)
 echo "[3/4] Setting up security firewall..."
 sudo ufw allow 22/tcp
+sudo ufw allow 20090/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw --force enable || true
