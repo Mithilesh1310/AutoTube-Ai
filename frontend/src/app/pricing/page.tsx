@@ -49,7 +49,7 @@ export default function PricingPage() {
         plan_tier: plan.id,
         billing_cycle: billingCycle,
         currency: currency,
-        gateway: 'UPI',
+        gateway: 'UPI' as any,
         user_id: 1
       });
       setUpiData(session);
@@ -69,7 +69,7 @@ export default function PricingPage() {
           plan_tier: checkoutPlan.id,
           billing_cycle: billingCycle,
           currency: currency,
-          gateway: 'UPI',
+          gateway: 'UPI' as any,
           user_id: 1
         });
         setUpiData(session);
@@ -91,7 +91,7 @@ export default function PricingPage() {
           plan_tier: checkoutPlan.id,
           billing_cycle: billingCycle,
           currency: currency,
-          gateway: 'UPI',
+          gateway: 'UPI' as any,
           transaction_id: txnId,
           amount: upiData?.amount || checkoutPlan.priceINR,
           user_id: 1
