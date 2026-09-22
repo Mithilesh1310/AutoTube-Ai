@@ -14,8 +14,15 @@ import {
   AuthResponse
 } from './types';
 
-const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const API_BASE = rawApi.endsWith('/api/v1') ? rawApi : `${rawApi.replace(/\/+$/, '')}/api/v1`;
+export const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/v1`;
+  }
+  const rawApi = process.env.NEXT_PUBLIC_API_URL || 'https://autotube.co.in/api/v1';
+  return rawApi.endsWith('/api/v1') ? rawApi : `${rawApi.replace(/\/+$/, '')}/api/v1`;
+};
+
+const API_BASE = getApiBase();
 
 // --- Token & Session Management ---
 export function getAuthToken(): string | null {
@@ -222,6 +229,57 @@ export async function fetchChannels(): Promise<YouTubeChannelItem[]> {
   return res.json();
 }
 
+export async function createChannel(data: {
+  channel_name: string;
+  niche: string;
+  visual_mode: string;
+  video_format?: string;
+  videos_per_day?: number;
+  publish_times?: string[];
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/channels`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to create channel');
+  }
+  return res.json();
+}
+
+export async function updateChannelAutomation(channelId: number, data: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/channels/${channelId}/automation`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update channel automation profile');
+  }
+  return res.json();
+}
+
+export async function toggleChannelAutomation(channelId: number, action: 'pause' | 'resume'): Promise<any> {
+  const res = await fetch(`${API_BASE}/channels/${channelId}/${action}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to ${action} channel automation`);
+  return res.json();
+}
+
+export async function deleteChannel(channelId: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/channels/${channelId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete channel');
+  return res.json();
+}
+
 export async function fetchYouTubeAuthUrl(): Promise<{ status: string; auth_url?: string }> {
   const res = await fetch(`${API_BASE}/youtube/auth-url`, { headers: getAuthHeaders(), cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch YouTube auth url');
@@ -277,7 +335,7 @@ export async function createCheckoutSession(payload: {
   plan_tier: string;
   billing_cycle: 'MONTHLY' | 'ANNUAL';
   currency: 'USD' | 'INR';
-  gateway: 'STRIPE' | 'RAZORPAY';
+  gateway: 'STRIPE' | 'RAZORPAY' | 'UPI' | 'DIRECT_UPI';
   user_id?: number;
 }): Promise<any> {
   const res = await fetch(`${API_BASE}/billing/create-checkout-session`, {
@@ -293,7 +351,7 @@ export async function verifyPayment(payload: {
   plan_tier: string;
   billing_cycle: 'MONTHLY' | 'ANNUAL';
   currency: 'USD' | 'INR';
-  gateway: 'STRIPE' | 'RAZORPAY';
+  gateway: 'STRIPE' | 'RAZORPAY' | 'UPI' | 'DIRECT_UPI';
   transaction_id: string;
   order_id?: string;
   amount: number;
