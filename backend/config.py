@@ -54,7 +54,8 @@ class Settings(BaseSettings):
     # Emergency Controls
     GLOBAL_EMERGENCY_STOP: bool = False
 
-    # SaaS Billing & Payment Gateways (Razorpay)
+    # SaaS Billing & Payment Gateways (UPI, Razorpay, Stripe)
+    DEFAULT_UPI_ID: str = "Q596657023@ybl"
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

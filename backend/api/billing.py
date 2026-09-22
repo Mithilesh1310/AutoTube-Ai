@@ -9,7 +9,7 @@ from sqlalchemy.future import select
 
 from backend.config import settings
 from backend.db.session import get_db
-from backend.db.models import User, Subscription, PaymentTransaction, YouTubeChannel
+from backend.db.models import User, Subscription, PaymentTransaction, YouTubeChannel, Setting
 
 logger = logging.getLogger(__name__)
 
@@ -98,40 +98,50 @@ PLANS_DATA = {
         },
         "features": [
             "Up to 10 YouTube Channels",
-            "Daily Multi-Post Automation (Morning & Evening)",
-            "Full 3D Animation & Moving AI Engine",
-            "Custom Voice Cloning & Custom Character Registry",
-            "Multi-Language Expansion (Hindi, English, Spanish)",
-            "Dedicated Account Manager & Fast SLA",
-            "Custom Webhook & API Access"
+            "300 Shorts + 30 Long-form / Month",
+            "Voice Cloning & Dialect Customization",
+            "Multi-channel Automated Schedules",
+            "VIP Priority GPU Pipeline",
+            "24/7 Dedicated Support Agent"
         ]
     }
 }
 
 class CheckoutRequest(BaseModel):
+    user_id: Optional[int] = 1
     plan_tier: str # STARTER, PRO, AGENCY
     billing_cycle: str = "MONTHLY" # MONTHLY, ANNUAL
-    currency: str = "USD" # USD, INR
-    gateway: str = "STRIPE" # STRIPE, RAZORPAY
-    user_id: Optional[int] = 1
+    currency: str = "INR" # USD, INR
+    gateway: str = "UPI" # UPI, RAZORPAY, STRIPE
 
 class PaymentVerifyRequest(BaseModel):
     user_id: Optional[int] = 1
     plan_tier: str
     billing_cycle: str = "MONTHLY"
-    currency: str = "USD"
-    gateway: str = "STRIPE"
+    currency: str = "INR"
+    gateway: str = "UPI"
     transaction_id: str
     order_id: Optional[str] = None
     amount: float
 
 @billing_router.get("/plans")
-async def get_plans():
+async def get_plans(db: AsyncSession = Depends(get_db)):
     """Retrieve public SaaS subscription plans, pricing, and feature comparison."""
+    upi_vpa = settings.DEFAULT_UPI_ID
+    try:
+        res = await db.execute(select(Setting).where(Setting.key == "DEFAULT_UPI_ID"))
+        db_setting = res.scalar_one_or_none()
+        if db_setting and db_setting.value:
+            upi_vpa = db_setting.value.strip()
+    except Exception as e:
+        logger.warning(f"Could not load DEFAULT_UPI_ID from db: {e}")
+
     return {
         "plans": PLANS_DATA,
         "supported_currencies": ["USD", "INR"],
         "gateways": {
+            "upi_enabled": True,
+            "default_upi_id": upi_vpa,
             "stripe_enabled": bool(settings.STRIPE_SECRET_KEY) or settings.BILLING_SANDBOX_MODE,
             "razorpay_enabled": bool(settings.RAZORPAY_KEY_ID) or settings.BILLING_SANDBOX_MODE,
             "sandbox_mode": settings.BILLING_SANDBOX_MODE
@@ -140,7 +150,8 @@ async def get_plans():
 
 @billing_router.post("/create-checkout-session")
 async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = Depends(get_db)):
-    """Creates a checkout session for Stripe or an Order for Razorpay, with sandbox simulation fallback."""
+    """Creates a checkout session for UPI, Stripe, or Razorpay."""
+    import urllib.parse
     plan = PLANS_DATA.get(payload.plan_tier)
     if not plan:
         raise HTTPException(status_code=400, detail=f"Invalid plan tier: {payload.plan_tier}")
@@ -149,6 +160,39 @@ async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = D
     curr = payload.currency.upper()
     pricing_info = plan["pricing"].get(curr, plan["pricing"]["USD"])
     amount = pricing_info["annual"] if cycle == "ANNUAL" else pricing_info["monthly"]
+
+    # 1. Direct Instant UPI Payment Gateway (0% Fee, GPay/PhonePe/Paytm Intent & Dynamic QR)
+    if payload.gateway.upper() in ["UPI", "DIRECT_UPI"]:
+        upi_vpa = (settings.DEFAULT_UPI_ID or "Q596657023@ybl").strip()
+        try:
+            res = await db.execute(select(Setting).where(Setting.key == "DEFAULT_UPI_ID"))
+            db_setting = res.scalar_one_or_none()
+            if db_setting and db_setting.value and db_setting.value.strip():
+                upi_vpa = db_setting.value.strip()
+        except Exception as e:
+            logger.warning(f"Could not fetch DEFAULT_UPI_ID from DB: {e}")
+
+        payee_name = "AutoTubeAI"
+        txn_note = f"AutoTube_{payload.plan_tier}"
+        
+        upi_link = f"upi://pay?pa={upi_vpa}&pn={payee_name}&am={int(amount)}&cu=INR&tn={txn_note}"
+        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(upi_link)}"
+        session_id = f"upi_ord_{uuid.uuid4().hex[:10]}"
+        
+        return {
+            "gateway": "UPI",
+            "mode": "INSTANT_UPI",
+            "upi_id": upi_vpa,
+            "upi_link": upi_link,
+            "qr_code_url": qr_code_url,
+            "amount": amount,
+            "currency": "INR",
+            "plan_tier": payload.plan_tier,
+            "billing_cycle": cycle,
+            "session_id": session_id,
+            "order_id": session_id,
+            "message": "Scan QR Code with any UPI App or click Pay via GPay/PhonePe/Paytm."
+        }
 
     # 1. Real Stripe Integration if key is configured
     if payload.gateway.upper() == "STRIPE" and settings.STRIPE_SECRET_KEY:
