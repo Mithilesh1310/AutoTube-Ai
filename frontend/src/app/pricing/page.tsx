@@ -396,30 +396,9 @@ export default function PricingPage() {
               </p>
             </div>
 
-            {/* Gateway Selector Tabs */}
-            <div className="grid grid-cols-2 gap-2 bg-slate-900 p-1 rounded-2xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => handleSwitchGateway('UPI')}
-                className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                  selectedGateway === 'UPI'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" /> Instant UPI (0% Fee)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchGateway('RAZORPAY')}
-                className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                  selectedGateway === 'RAZORPAY'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5" /> Razorpay
-              </button>
+            {/* Instant UPI Header */}
+            <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 text-center">
+              <p className="text-xs font-bold text-emerald-400">⚡ Direct Instant UPI Payment (0% Fee)</p>
             </div>
 
             {/* Instant UPI Payment Body */}

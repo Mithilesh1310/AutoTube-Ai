@@ -19,9 +19,11 @@ export default function SaaSMarketingLandingPage() {
   
   // Checkout Modal State
   const [checkoutPlan, setCheckoutPlan] = useState<PlanItem | null>(null);
-  const [selectedGateway, setSelectedGateway] = useState<'STRIPE' | 'RAZORPAY'>('RAZORPAY');
+  const [selectedGateway, setSelectedGateway] = useState<'UPI' | 'RAZORPAY'>('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState<string | null>(null);
+  const [upiData, setUpiData] = useState<any | null>(null);
+  const [utrNumber, setUtrNumber] = useState<string>('');
 
   useEffect(() => {
     fetchPlans()
@@ -29,15 +31,70 @@ export default function SaaSMarketingLandingPage() {
       .catch(err => console.error("Failed to load plans:", err));
   }, []);
 
-  const handleOpenCheckout = (plan: PlanItem) => {
+  const handleOpenCheckout = async (plan: PlanItem) => {
     setCheckoutPlan(plan);
     setCheckoutSuccess(null);
+    setUtrNumber('');
+    setIsProcessing(true);
+    try {
+      const session = await createCheckoutSession({
+        plan_tier: plan.id,
+        billing_cycle: billingCycle,
+        currency: currency,
+        gateway: "UPI",
+        user_id: 1
+      });
+      setUpiData(session);
+    } catch (err: any) {
+      console.error("Failed to load UPI checkout data:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSwitchGateway = async (gw: 'UPI' | 'RAZORPAY') => {
+    setSelectedGateway(gw);
+    if (gw === 'UPI' && checkoutPlan && !upiData) {
+      setIsProcessing(true);
+      try {
+        const session = await createCheckoutSession({
+          plan_tier: checkoutPlan.id,
+          billing_cycle: billingCycle,
+          currency: currency,
+          gateway: "UPI",
+          user_id: 1
+        });
+        setUpiData(session);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   const handleExecutePayment = async () => {
     if (!checkoutPlan) return;
     setIsProcessing(true);
     try {
+      if (selectedGateway === 'UPI') {
+        const txnId = utrNumber.trim() || upiData?.session_id || `utr_${Date.now()}`;
+        const verified = await verifyPayment({
+          plan_tier: checkoutPlan.id,
+          billing_cycle: billingCycle,
+          currency: currency,
+          gateway: "UPI",
+          transaction_id: txnId,
+          amount: upiData?.amount || checkoutPlan.pricing[currency].monthly,
+          user_id: 1
+        });
+        setCheckoutSuccess(`🎉 ${verified.message} Plan valid until ${verified.valid_until}.`);
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1800);
+        return;
+      }
+
       const session = await createCheckoutSession({
         plan_tier: checkoutPlan.id,
         billing_cycle: billingCycle,
@@ -64,7 +121,7 @@ export default function SaaSMarketingLandingPage() {
       setCheckoutSuccess(`🎉 ${verified.message} Plan valid until ${verified.valid_until}.`);
       setTimeout(() => {
         window.location.href = '/dashboard';
-      }, 2000);
+      }, 1800);
     } catch (err: any) {
       alert("Payment processing error: " + err.message);
     } finally {
@@ -290,8 +347,8 @@ export default function SaaSMarketingLandingPage() {
                   AT
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">Kids CartoonUniverse &bull; Studio</h3>
-                  <p className="text-[11px] text-gray-400">Autonomous Hindi Story Channel</p>
+                  <h3 className="text-sm font-bold text-gray-900">AutoTube AI &bull; Demo Studio</h3>
+                  <p className="text-[11px] text-gray-400">Autonomous 3D Video Production Engine</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -500,7 +557,7 @@ export default function SaaSMarketingLandingPage() {
                     onClick={() => handleOpenCheckout(plan)}
                     className="w-full py-3 rounded-xl btn-polymer-black text-xs font-bold transition shadow-xs flex items-center justify-center gap-1"
                   >
-                    <span>Pay with Razorpay →</span>
+                    <span>Pay via Instant UPI / Scan QR →</span>
                   </button>
                 </div>
               </div>
@@ -509,7 +566,7 @@ export default function SaaSMarketingLandingPage() {
         </div>
 
         <div className="text-center text-xs text-gray-500">
-          Instant activation via Razorpay UPI (GPay, PhonePe, Paytm), Netbanking, and Credit/Debit Cards.
+          Instant activation via Direct 0% Fee UPI (Google Pay, PhonePe, Paytm, BHIM QR).
         </div>
 
         {/* Polymer Black Callout Box */}
@@ -689,57 +746,132 @@ export default function SaaSMarketingLandingPage() {
 
       {/* 9. Checkout & Subscription Modal */}
       {checkoutPlan && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white border border-gray-200 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
-                  Razorpay Secure Checkout
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  Instant Checkout &bull; 0% Fee
                 </span>
-                <h3 className="font-extrabold text-lg text-gray-900 mt-1">Activate {checkoutPlan.name} Plan</h3>
+                <h3 className="font-extrabold text-lg text-white mt-1">Activate {checkoutPlan.name} Plan</h3>
               </div>
               <button
                 onClick={() => setCheckoutPlan(null)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-black flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center border border-slate-700"
               >
                 ✕
               </button>
             </div>
 
+            {/* Instant UPI Active Header */}
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-center">
+              <span className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+                <span>⚡ Direct Instant UPI Payment (0% Fee)</span>
+              </span>
+            </div>
+
             {/* Price Confirmation */}
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
-                <span className="text-xs text-gray-500 font-medium">Selected Tier &bull; {billingCycle}</span>
-                <div className="text-2xl font-black text-gray-900">
+                <span className="text-xs text-slate-400 font-medium">Selected Tier &bull; {billingCycle}</span>
+                <div className="text-2xl font-black text-white">
                   {checkoutPlan.pricing[currency].currency_symbol}
                   {billingCycle === 'ANNUAL'
                     ? checkoutPlan.pricing[currency].annual.toLocaleString()
                     : checkoutPlan.pricing[currency].monthly.toLocaleString()}
-                  <span className="text-xs font-normal text-gray-500">
+                  <span className="text-xs font-normal text-slate-400">
                     {billingCycle === 'ANNUAL' ? '/year' : '/month'}
                   </span>
                 </div>
               </div>
-              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Razorpay Instant Activation
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Instant Credits Added
               </span>
             </div>
 
-            {/* Gateway Info */}
-            <div className="p-3 rounded-xl bg-slate-900 text-white text-xs font-semibold flex items-center gap-2">
-              <span className="text-emerald-400 font-bold">💳 Payment Gateway:</span>
-              <span>Razorpay (UPI, GPay, Paytm, Cards, Netbanking)</span>
-            </div>
+            {/* UPI Option View */}
+            {selectedGateway === 'UPI' && upiData && (
+              <div className="space-y-4 animate-in fade-in">
+                {/* Dynamic QR Code */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-3">
+                  <div className="text-xs font-bold text-slate-300 flex items-center justify-center gap-2">
+                    <span>Scan with GPay / PhonePe / Paytm / BHIM</span>
+                  </div>
+                  
+                  <div className="w-48 h-48 mx-auto p-2 bg-white rounded-2xl border-4 border-emerald-500/40 shadow-xl flex items-center justify-center">
+                    <img 
+                      src={upiData.qr_code_url} 
+                      alt="UPI Dynamic QR Code" 
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 text-xs">
+                    <span className="text-slate-400 font-mono bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+                      UPI VPA: <strong className="text-emerald-400">{upiData.upi_id}</strong>
+                    </span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(upiData.upi_id)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-[11px] font-bold border border-slate-700"
+                    >
+                      Copy VPA
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile Direct Apps */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Or Tap to Pay via UPI App (Mobile):
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <a
+                      href={upiData.upi_link}
+                      className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-center text-xs font-bold text-white transition flex flex-col items-center gap-1"
+                    >
+                      <span>💙 GPay</span>
+                    </a>
+                    <a
+                      href={upiData.upi_link}
+                      className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-center text-xs font-bold text-white transition flex flex-col items-center gap-1"
+                    >
+                      <span>💜 PhonePe</span>
+                    </a>
+                    <a
+                      href={upiData.upi_link}
+                      className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-center text-xs font-bold text-white transition flex flex-col items-center gap-1"
+                    >
+                      <span>💙 Paytm</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* UTR Reference Input */}
+                <div className="space-y-1.5 pt-2">
+                  <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                    <span>12-Digit UTR / Transaction Ref No.</span>
+                    <span className="text-[10px] text-slate-400 font-normal">(Shown in your UPI app receipt)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 426890123456"
+                    value={utrNumber}
+                    onChange={(e) => setUtrNumber(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-xs font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {checkoutSuccess ? (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold text-center animate-in fade-in">
-                {checkoutSuccess} Redirecting to Studio...
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold text-center animate-in fade-in">
+                {checkoutSuccess} Redirecting to Studio Console...
               </div>
             ) : (
               <button
                 onClick={handleExecutePayment}
                 disabled={isProcessing}
-                className="w-full py-3.5 rounded-xl btn-polymer-black text-xs font-bold transition shadow-sm flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isProcessing ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -747,7 +879,9 @@ export default function SaaSMarketingLandingPage() {
                   <Lock className="w-4 h-4" />
                 )}
                 <span>
-                  {isProcessing ? "Processing Razorpay Activation..." : `Proceed to Razorpay Checkout →`}
+                  {isProcessing
+                    ? "Verifying Payment & Activating..."
+                    : "Submit UTR & Activate Plan →"}
                 </span>
               </button>
             )}
