@@ -182,7 +182,7 @@ export default function ChannelsPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchChannels}
+            onClick={loadChannelsData}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
             title="Refresh channels"
           >
