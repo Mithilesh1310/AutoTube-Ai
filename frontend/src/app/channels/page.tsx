@@ -85,6 +85,23 @@ export default function ChannelsPage() {
     loadChannelsData();
   }, []);
 
+  const handleStartGoogleOAuth = async () => {
+    if (ytAuthUrl) {
+      window.location.href = ytAuthUrl;
+      return;
+    }
+    try {
+      const auth = await fetchYouTubeAuthUrl();
+      if (auth && auth.auth_url) {
+        window.location.href = auth.auth_url;
+      } else {
+        alert('Google OAuth initialization error. Please try again.');
+      }
+    } catch (err: any) {
+      alert('Failed to launch Google OAuth: ' + err.message);
+    }
+  };
+
   const handleToggleAutomation = async (channel: YouTubeChannelItem) => {
     const isCurrentlyEnabled = channel.profile?.automation_enabled ?? true;
     const action = isCurrentlyEnabled ? 'pause' : 'resume';
@@ -202,14 +219,13 @@ export default function ChannelsPage() {
             <Plus className="w-4 h-4" /> Create Channel Profile
           </button>
 
-          {ytAuthUrl && (
-            <a
-              href={ytAuthUrl}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm shadow-lg shadow-red-600/30 transition"
-            >
-              <Globe className="w-4 h-4" /> 🔴 Connect YouTube (Google OAuth)
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={handleStartGoogleOAuth}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm shadow-lg shadow-red-600/30 transition"
+          >
+            <Globe className="w-4 h-4" /> 🔴 Connect YouTube (Google OAuth)
+          </button>
         </div>
       </div>
 
@@ -222,25 +238,24 @@ export default function ChannelsPage() {
       )}
 
       {/* Top Google OAuth Callout Banner */}
-      {ytAuthUrl && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-red-600/20 via-slate-900 to-indigo-600/20 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-lg shadow-red-600/30">
-              OAuth
-            </div>
-            <div>
-              <h4 className="text-sm font-extrabold text-white">Step 3: Connect Official YouTube Account via Google OAuth</h4>
-              <p className="text-xs text-slate-300">Authorize AutoTube AI to automatically upload 3D Pixar Shorts to your channel daily.</p>
-            </div>
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-red-600/20 via-slate-900 to-indigo-600/20 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-lg shadow-red-600/30">
+            OAuth
           </div>
-          <a
-            href={ytAuthUrl}
-            className="shrink-0 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs shadow-lg shadow-red-600/30 transition flex items-center gap-2"
-          >
-            <Globe className="w-4 h-4" /> Authorize Google / YouTube Channel →
-          </a>
+          <div>
+            <h4 className="text-sm font-extrabold text-white">Step 3: Connect Official YouTube Account via Google OAuth</h4>
+            <p className="text-xs text-slate-300">Authorize AutoTube AI to automatically upload 3D Pixar Shorts to your channel daily.</p>
+          </div>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleStartGoogleOAuth}
+          className="shrink-0 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs shadow-lg shadow-red-600/30 transition flex items-center gap-2"
+        >
+          <Globe className="w-4 h-4" /> Authorize Google / YouTube Channel →
+        </button>
+      </div>
 
       {/* Channel Cards Grid */}
       {loading ? (
@@ -330,15 +345,19 @@ export default function ChannelsPage() {
                   </div>
                 </div>
 
-                {!ch.is_connected && ytAuthUrl && (
-                  <div className="mb-4 p-3 rounded-xl bg-red-600/10 border border-red-500/30 flex items-center justify-between gap-2">
-                    <span className="text-xs text-red-300 font-bold">🔴 Pending YouTube OAuth Access</span>
-                    <a
-                      href={ytAuthUrl}
-                      className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-md shadow-red-600/30 transition flex items-center gap-1.5"
+                {!ch.is_connected && (
+                  <div className="mb-4 p-3.5 rounded-xl bg-red-600/10 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                      <span className="text-xs text-red-300 font-extrabold">🔴 Step 3: Pending Google OAuth Access</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartGoogleOAuth}
+                      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-md shadow-red-600/30 transition flex items-center gap-1.5 shrink-0"
                     >
                       <Globe className="w-3.5 h-3.5" /> Connect Google OAuth →
-                    </a>
+                    </button>
                   </div>
                 )}
 
