@@ -29,8 +29,8 @@ class AuthResponse(BaseModel):
     user_id: int
     username: str
     email: str
-    plan_tier: str = "STARTER"
-    credits_balance: float = 500.0
+    plan_tier: str = "FREE_TRIAL"
+    credits_balance: float = 50.0
 
 async def get_current_user(
     authorization: Optional[str] = Header(None),
@@ -118,8 +118,8 @@ async def register_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)
         user_id=new_user.id,
         username=new_user.username,
         email=new_user.email,
-        plan_tier=new_user.plan_tier or "STARTER",
-        credits_balance=new_user.credits_balance or 500.0
+        plan_tier=new_user.plan_tier or "FREE_TRIAL",
+        credits_balance=new_user.credits_balance if new_user.credits_balance is not None else 50.0
     )
 
 @auth_router.post("/login", response_model=AuthResponse)
@@ -135,8 +135,8 @@ async def login_user(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         user_id=user.id,
         username=user.username,
         email=user.email,
-        plan_tier=user.plan_tier or "STARTER",
-        credits_balance=user.credits_balance or 500.0
+        plan_tier=user.plan_tier or "FREE_TRIAL",
+        credits_balance=user.credits_balance if user.credits_balance is not None else 50.0
     )
 
 @auth_router.post("/google", response_model=AuthResponse)
@@ -175,8 +175,8 @@ async def google_sign_in(req: GoogleAuthRequest, db: AsyncSession = Depends(get_
             username=username_candidate,
             email=google_email,
             password_hash=hash_password(rand_pass),
-            credits_balance=500.0,
-            plan_tier="STARTER",
+            credits_balance=50.0,
+            plan_tier="FREE_TRIAL",
             subscription_status="ACTIVE"
         )
         db.add(user)
@@ -213,8 +213,8 @@ async def google_sign_in(req: GoogleAuthRequest, db: AsyncSession = Depends(get_
         user_id=user.id,
         username=user.username,
         email=user.email,
-        plan_tier=user.plan_tier or "STARTER",
-        credits_balance=user.credits_balance or 500.0
+        plan_tier=user.plan_tier or "FREE_TRIAL",
+        credits_balance=user.credits_balance if user.credits_balance is not None else 50.0
     )
 
 @auth_router.get("/me")

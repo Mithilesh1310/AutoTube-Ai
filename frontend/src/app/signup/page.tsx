@@ -92,7 +92,7 @@ export default function SignupPage() {
         <div className="mt-2.5 flex justify-center">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-xs font-semibold text-emerald-700 shadow-sm">
             <Zap className="w-3.5 h-3.5 fill-emerald-500 text-emerald-500" />
-            Instant 500 Free AI Video Credits Included
+            Instant 50 Free Trial AI Video Credits Included
           </span>
         </div>
       </div>
@@ -211,7 +211,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full mt-2 py-3.5 px-4 rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-sm shadow-xl shadow-neutral-900/10 flex items-center justify-center gap-2 group transition-all active:scale-[0.99] disabled:opacity-50"
             >
-              <span>{loading ? 'Creating Account...' : 'Get Started with 500 Credits'}</span>
+              <span>{loading ? 'Creating Account...' : 'Start Free Trial (50 Credits)'}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </form>
