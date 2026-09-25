@@ -283,10 +283,41 @@ async def verify_payment(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Verifies and finalizes user subscription, increasing plan limits and crediting quota."""
+    """Verifies and finalizes user subscription with strict security and anti-fraud UTR validation."""
     user = current_user
-    plan = PLANS_DATA.get(payload.plan_tier, PLANS_DATA["STARTER"])
+    plan = PLANS_DATA.get(payload.plan_tier)
+    if not plan:
+        raise HTTPException(status_code=400, detail=f"Invalid plan tier: {payload.plan_tier}")
+
     limits = plan["limits"]
+    gw = payload.gateway.upper()
+    txn_id = (payload.transaction_id or "").strip()
+
+    # --- STRICT UTR SECURITY & VERIFICATION GATES ---
+    if gw in ["UPI", "DIRECT_UPI"]:
+        if not txn_id or not txn_id.isdigit() or len(txn_id) != 12:
+            raise HTTPException(
+                status_code=400,
+                detail="Payment verification failed: Valid 12-digit numeric UTR / Reference Number is required. Please check your GPay/PhonePe/Paytm receipt."
+            )
+        
+        # Anti-Fraud Duplicate UTR Replay Prevention
+        existing_tx = await db.execute(
+            select(PaymentTransaction).where(PaymentTransaction.transaction_id == txn_id)
+        )
+        if existing_tx.scalars().first():
+            raise HTTPException(
+                status_code=400,
+                detail="This UTR / Transaction Reference Number has already been processed or submitted. Duplicate submissions are rejected."
+            )
+
+    elif gw == "RAZORPAY":
+        if not txn_id or txn_id.startswith("order_sim_") or txn_id.startswith("tx_"):
+            if not (settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Razorpay gateway is disabled. Please pay using Direct Instant UPI."
+                )
 
     # Calculate cycle duration
     now = datetime.datetime.utcnow()
@@ -296,9 +327,9 @@ async def verify_payment(
     # 1. Record Transaction
     tx = PaymentTransaction(
         user_id=user.id,
-        gateway=payload.gateway.upper(),
-        transaction_id=payload.transaction_id,
-        order_id=payload.order_id or payload.transaction_id,
+        gateway=gw,
+        transaction_id=txn_id,
+        order_id=payload.order_id or txn_id,
         amount=payload.amount,
         currency=payload.currency.upper(),
         status="SUCCESS",
@@ -319,8 +350,8 @@ async def verify_payment(
             currency=payload.currency.upper(),
             amount=payload.amount,
             status="ACTIVE",
-            payment_gateway=payload.gateway.upper(),
-            external_subscription_id=payload.transaction_id,
+            payment_gateway=gw,
+            external_subscription_id=txn_id,
             current_period_start=now,
             current_period_end=end_date
         )
@@ -346,7 +377,7 @@ async def verify_payment(
 
     return {
         "success": True,
-        "message": f"Successfully activated {plan['name']}!",
+        "message": f"Successfully verified payment & activated {plan['name']}!",
         "plan_tier": user.plan_tier,
         "credits_balance": user.credits_balance,
         "valid_until": end_date.strftime("%Y-%m-%d")

@@ -83,13 +83,24 @@ export default function PricingPage() {
     setIsProcessing(true);
     try {
       if (selectedGateway === 'UPI') {
-        const txnId = utrNumber.trim() || upiData?.session_id || `utr_${Date.now()}`;
+        const cleanUtr = utrNumber.trim();
+        if (!cleanUtr) {
+          alert('⚠️ Payment Verification Failed!\n\nPlease complete the UPI payment in your app (GPay/PhonePe/Paytm) and enter the 12-digit UTR / Reference Number from your receipt.');
+          setIsProcessing(false);
+          return;
+        }
+        if (!/^\d{12}$/.test(cleanUtr)) {
+          alert('⚠️ Invalid UTR Format!\n\nThe UTR number must be exactly 12 numeric digits (e.g., 425612349876) found on your payment receipt.');
+          setIsProcessing(false);
+          return;
+        }
+
         const verified = await verifyPayment({
           plan_tier: checkoutPlan.id,
           billing_cycle: billingCycle,
           currency: currency,
           gateway: 'UPI' as any,
-          transaction_id: txnId,
+          transaction_id: cleanUtr,
           amount: upiData?.amount || checkoutPlan.priceINR
         });
         setCheckoutSuccess(`🎉 ${verified.message} Valid until ${verified.valid_until}.`);
@@ -125,7 +136,7 @@ export default function PricingPage() {
         window.location.href = '/dashboard';
       }, 1800);
     } catch (err: any) {
-      alert('Payment processing error: ' + err.message);
+      alert('Payment Verification Error: ' + err.message);
     } finally {
       setIsProcessing(false);
     }
@@ -464,9 +475,10 @@ export default function PricingPage() {
                   </label>
                   <input
                     type="text"
+                    maxLength={12}
                     value={utrNumber}
-                    onChange={(e) => setUtrNumber(e.target.value)}
-                    placeholder="e.g. 425612349876"
+                    onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                    placeholder="Enter 12-digit UTR (e.g. 425612349876)"
                     className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                   />
                 </div>
