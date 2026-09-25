@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { registerUser, googleLoginUser } from '@/lib/api';
@@ -14,6 +14,20 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get('access_token');
+      if (accessToken) {
+        setGoogleLoading(true);
+        googleLoginUser(accessToken)
+          .then(() => router.push('/dashboard'))
+          .catch((err: any) => setError(err.message || 'Google sign-in failed'))
+          .finally(() => setGoogleLoading(false));
+      }
+    }
+  }, []);
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,42 +50,17 @@ export default function SignupPage() {
   const handleGoogleSignUp = async () => {
     setError(null);
     setGoogleLoading(true);
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '844381750533-cc5cou0s7p5gmcm52ginallv2lv7dh8b.apps.googleusercontent.com';
 
-    if (typeof window !== 'undefined' && (window as any).google && googleClientId) {
-      try {
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId,
-          scope: 'email profile openid',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              try {
-                await googleLoginUser(tokenResponse.access_token);
-                router.push('/dashboard');
-              } catch (e: any) {
-                setError(e.message || 'Google signup failed.');
-                setGoogleLoading(false);
-              }
-            }
-          },
-        });
-        client.requestAccessToken();
-        return;
-      } catch (err) {
-        console.warn('Google client error:', err);
-      }
+    if (typeof window !== 'undefined' && googleClientId) {
+      const redirectUri = window.location.origin + '/login';
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile%20openid`;
+      window.location.href = authUrl;
+      return;
     }
 
-    // Instant registration fallback for dev testing
-    try {
-      const rand = Math.floor(Math.random() * 9000) + 1000;
-      await registerUser(`creator_${rand}`, `creator_${rand}@autotube.ai`, 'Password123!');
-      router.push('/dashboard');
-    } catch (e: any) {
-      setError('Please sign up with email and password below.');
-    } finally {
-      setGoogleLoading(false);
-    }
+    setGoogleLoading(false);
+    setError('Google Sign-Up is not configured. Please register with email and password below.');
   };
 
   return (

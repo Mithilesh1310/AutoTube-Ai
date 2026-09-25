@@ -15,15 +15,16 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if Google Identity Services script is available or load it dynamically
-    const scriptId = 'google-jssdk';
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get('access_token');
+      if (accessToken) {
+        setGoogleLoading(true);
+        googleLoginUser(accessToken)
+          .then(() => router.push('/dashboard'))
+          .catch((err: any) => setError(err.message || 'Google sign-in failed.'))
+          .finally(() => setGoogleLoading(false));
+      }
     }
   }, []);
 
@@ -45,46 +46,17 @@ export default function LoginPage() {
     setError(null);
     setGoogleLoading(true);
 
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '844381750533-cc5cou0s7p5gmcm52ginallv2lv7dh8b.apps.googleusercontent.com';
 
-    // If client ID is configured and Google SDK is loaded
-    if (typeof window !== 'undefined' && (window as any).google && googleClientId) {
-      try {
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId,
-          scope: 'email profile openid',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              // Fallback with access_token or credential
-              try {
-                const res = await googleLoginUser(tokenResponse.access_token);
-                router.push('/dashboard');
-              } catch (e: any) {
-                setError(e.message || 'Google authentication failed');
-                setGoogleLoading(false);
-              }
-            }
-          },
-        });
-        client.requestAccessToken();
-        return;
-      } catch (err: any) {
-        console.warn('Google client init failed:', err);
-      }
+    if (typeof window !== 'undefined' && googleClientId) {
+      const redirectUri = window.location.origin + '/login';
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile%20openid`;
+      window.location.href = authUrl;
+      return;
     }
 
-    // Direct Simulated One-Tap for instant preview & testing if client ID not yet added
-    try {
-      // Create a test user token directly for instant testing
-      const res = await loginUser('demo@autotube.ai', 'password').catch(async () => {
-        return await loginUser('tester@launch.com', 'Password123!');
-      });
-      router.push('/dashboard');
-    } catch (e: any) {
-      setError('Please enter your email and password, or add NEXT_PUBLIC_GOOGLE_CLIENT_ID.');
-    } finally {
-      setGoogleLoading(false);
-    }
+    setGoogleLoading(false);
+    setError('Google Sign-In is not configured. Please sign in with your email and password below.');
   };
 
   return (

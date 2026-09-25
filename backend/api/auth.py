@@ -36,27 +36,42 @@ async def get_current_user(
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    """Dependency: Extract current authenticated user from Bearer header, or fallback to default demo user."""
+    """Dependency: Extract current authenticated user from Bearer header. Enforces multi-tenant isolation."""
     user = None
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         payload = decode_access_token(token)
         if payload and "sub" in payload:
-            user_id = int(payload["sub"])
-            res = await db.execute(select(User).where(User.id == user_id))
-            user = res.scalar_one_or_none()
-
-    if not user:
-        # Fallback to default demo user for backward compatibility
-        res = await db.execute(select(User).where(User.email == "demo@autotube.ai"))
-        user = res.scalar_one_or_none()
+            try:
+                user_id = int(payload["sub"])
+                res = await db.execute(select(User).where(User.id == user_id))
+                user = res.scalar_one_or_none()
+            except (ValueError, TypeError):
+                pass
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or locate default demo user."
+            detail="Authentication required. Please sign in to your AutoTube Studio account.",
+            headers={"WWW-Authenticate": "Bearer"}
         )
     return user
+
+async def get_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Dependency: Restricts sensitive system configuration endpoints to Admin / Owner accounts only."""
+    is_owner = (
+        current_user.id == 1 or 
+        getattr(current_user, "is_admin", False) or 
+        current_user.email in ["monusahani0044@gmail.com", "founder@autotube.ai", "admin@autotube.co.in", "2k24.csai1b.2412184@gmail.com"]
+    )
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Only the platform owner/admin can modify global system settings & receiver UPI ID."
+        )
+    return current_user
 
 @auth_router.post("/register", response_model=AuthResponse)
 async def register_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
@@ -69,8 +84,8 @@ async def register_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)
         username=req.username,
         email=req.email,
         password_hash=hash_password(req.password),
-        credits_balance=500.0,
-        plan_tier="STARTER"
+        credits_balance=50.0,
+        plan_tier="FREE_TRIAL"
     )
     db.add(new_user)
     await db.flush()

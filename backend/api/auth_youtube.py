@@ -49,7 +49,7 @@ def get_oauth_flow(state: str = None):
     return flow
 
 @youtube_auth_router.get("/auth-url")
-async def get_auth_url(current_user: User = Depends(get_current_user)):
+async def get_auth_url(request: Request, current_user: User = Depends(get_current_user)):
     if not settings.YOUTUBE_CLIENT_ID or not settings.YOUTUBE_CLIENT_SECRET:
         return {
             "status": "UNCONFIGURED",
@@ -58,7 +58,14 @@ async def get_auth_url(current_user: User = Depends(get_current_user)):
         }
 
     try:
-        state_data = {"uid": current_user.id, "rnd": uuid.uuid4().hex[:8]}
+        origin = request.headers.get("referer") or str(request.base_url)
+        origin = origin.rstrip("/")
+        if "/channels" in origin:
+            origin = origin.split("/channels")[0]
+        if "/settings" in origin:
+            origin = origin.split("/settings")[0]
+
+        state_data = {"uid": current_user.id, "origin": origin, "rnd": uuid.uuid4().hex[:8]}
         state_str = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
         flow = get_oauth_flow(state=state_str)
         auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
@@ -75,10 +82,13 @@ async def oauth_callback(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing authorization code")
 
     target_user_id = 1
+    frontend_origin = "https://autotube.co.in"
     if state:
         try:
             decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
             target_user_id = int(decoded.get("uid", 1))
+            if decoded.get("origin"):
+                frontend_origin = str(decoded.get("origin")).rstrip("/")
         except Exception:
             pass
 
@@ -143,7 +153,7 @@ async def oauth_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
         await db.commit()
         logger.info(f"✅ Connected YouTube Channel for user #{target_user_id}: {channel_title} ({channel_id})")
-        return RedirectResponse(url="http://localhost:3000/settings?youtube_connected=true")
+        return RedirectResponse(url=f"{frontend_origin}/channels?youtube_connected=true")
 
     except Exception as e:
         logger.error(f"OAuth callback error: {e}")
