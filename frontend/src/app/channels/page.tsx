@@ -41,6 +41,7 @@ export default function ChannelsPage() {
   const [ytAuthUrl, setYtAuthUrl] = useState<string | null>(null);
   const [ytChannelInfo, setYtChannelInfo] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Form state for adding/editing
   const [formName, setFormName] = useState('');
@@ -75,6 +76,12 @@ export default function ChannelsPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('youtube_connected') === 'true') {
+        setSuccessNotice('🎉 YouTube Channel successfully connected via Google OAuth! Auto-Pilot uploads enabled.');
+      }
+    }
     loadChannelsData();
   }, []);
 
