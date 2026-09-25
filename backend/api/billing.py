@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from backend.config import settings
 from backend.db.session import get_db
 from backend.db.models import User, Subscription, PaymentTransaction, YouTubeChannel, Setting
+from backend.api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,11 @@ async def get_plans(db: AsyncSession = Depends(get_db)):
     }
 
 @billing_router.post("/create-checkout-session")
-async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = Depends(get_db)):
+async def create_checkout_session(
+    payload: CheckoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Creates a checkout session for UPI, Stripe, or Razorpay."""
     import urllib.parse
     plan = PLANS_DATA.get(payload.plan_tier)
@@ -173,7 +178,7 @@ async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = D
             logger.warning(f"Could not fetch DEFAULT_UPI_ID from DB: {e}")
 
         payee_name = "AutoTubeAI"
-        txn_note = f"AutoTube_{payload.plan_tier}"
+        txn_note = f"AutoTube_{payload.plan_tier}_u{current_user.id}"
         
         upi_link = f"upi://pay?pa={upi_vpa}&pn={payee_name}&am={int(amount)}&cu=INR&tn={txn_note}"
         qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(upi_link)}"
@@ -215,7 +220,7 @@ async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = D
                 mode='payment',
                 success_url='http://localhost:3000/dashboard?payment=success&tier=' + payload.plan_tier,
                 cancel_url='http://localhost:3000/?payment=cancelled',
-                metadata={'user_id': str(payload.user_id), 'plan_tier': payload.plan_tier}
+                metadata={'user_id': str(current_user.id), 'plan_tier': payload.plan_tier}
             )
             return {
                 "checkout_url": session.url,
@@ -238,7 +243,7 @@ async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = D
                     "currency": curr,
                     "receipt": order_receipt,
                     "notes": {
-                        "user_id": str(payload.user_id),
+                        "user_id": str(current_user.id),
                         "plan_tier": payload.plan_tier,
                         "cycle": cycle
                     }
@@ -273,23 +278,13 @@ async def create_checkout_session(payload: CheckoutRequest, db: AsyncSession = D
     }
 
 @billing_router.post("/verify-payment")
-async def verify_payment(payload: PaymentVerifyRequest, db: AsyncSession = Depends(get_db)):
+async def verify_payment(
+    payload: PaymentVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Verifies and finalizes user subscription, increasing plan limits and crediting quota."""
-    user_id = payload.user_id or 1
-    user_res = await db.execute(select(User).where(User.id == user_id))
-    user = user_res.scalars().first()
-    if not user:
-        # Create default user if not exists
-        user = User(
-            id=user_id,
-            username="startup_admin",
-            email="founder@autotube.ai",
-            password_hash="mock_hash_saas"
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-
+    user = current_user
     plan = PLANS_DATA.get(payload.plan_tier, PLANS_DATA["STARTER"])
     limits = plan["limits"]
 
@@ -358,12 +353,13 @@ async def verify_payment(payload: PaymentVerifyRequest, db: AsyncSession = Depen
     }
 
 @billing_router.get("/subscription-status")
-async def get_subscription_status(user_id: int = 1, db: AsyncSession = Depends(get_db)):
+async def get_subscription_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Returns the current user's active tier, usage limits, and renewal dates."""
-    user_res = await db.execute(select(User).where(User.id == user_id))
-    user = user_res.scalars().first()
-    
-    current_tier = user.plan_tier if user and user.plan_tier else "STARTER"
+    user_id = current_user.id
+    current_tier = current_user.plan_tier or "FREE_TRIAL"
     plan_info = PLANS_DATA.get(current_tier, PLANS_DATA["STARTER"])
 
     # Count connected channels
@@ -377,9 +373,9 @@ async def get_subscription_status(user_id: int = 1, db: AsyncSession = Depends(g
 
     return {
         "plan_tier": current_tier,
-        "plan_name": plan_info["name"],
-        "subscription_status": user.subscription_status if user else "ACTIVE",
-        "credits_balance": user.credits_balance if user else 500.0,
+        "plan_name": plan_info["name"] if current_tier in PLANS_DATA else "Free Trial",
+        "subscription_status": current_user.subscription_status or "ACTIVE",
+        "credits_balance": current_user.credits_balance if current_user.credits_balance is not None else 50.0,
         "renewal_date": renewal_str,
         "limits": plan_info["limits"],
         "usage": {

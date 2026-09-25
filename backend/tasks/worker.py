@@ -23,7 +23,7 @@ class BackgroundJobQueue:
     """
     def __init__(self):
         self.running = True
-        self._queue = asyncio.PriorityQueue() # (priority_int, task_payload)
+        self._queue = asyncio.PriorityQueue() # (priority_int, timestamp, task_payload)
         self.active_tasks: Dict[str, asyncio.Task] = {}
         self.completed_count = 0
         self.failed_count = 0
@@ -66,14 +66,14 @@ class BackgroundJobQueue:
             )
             await session.commit()
 
-        # Enqueue with priority tuple
+        # Enqueue with priority tuple: (prio_int, enqueued_at_timestamp, payload)
         prio_int = self.priority_to_int(priority)
-        await self._queue.put((prio_int, payload))
+        await self._queue.put((prio_int, time.time(), payload))
         logger.info(f"[JobQueue] Enqueued Job #{job_id} (Priority: {priority}, Mode: {visual_mode}). Queue depth: {self._queue.qsize()}")
 
     async def dequeue_job(self) -> Dict[str, Any]:
         """Pops the highest-priority job payload from the priority queue."""
-        prio_int, payload = await self._queue.get()
+        prio_int, seq_ts, payload = await self._queue.get()
         return payload
 
     def _compute_backoff_delay(self, retry_count: int) -> float:
@@ -129,7 +129,7 @@ class BackgroundJobQueue:
                 logger.info(f"[JobQueue] Retrying Job #{job_id} in {backoff_seconds:.1f}s...")
                 await asyncio.sleep(backoff_seconds)
                 payload["attempt"] += 1
-                await self._queue.put((self.priority_to_int(payload["priority"]), payload))
+                await self._queue.put((self.priority_to_int(payload["priority"]), time.time(), payload))
             else:
                 # Max retries exhausted -> Move to Dead Letter
                 self.dead_letter_count += 1
@@ -153,7 +153,7 @@ class BackgroundJobQueue:
             try:
                 try:
                     # Wait up to 1 second for a job
-                    prio, payload = await asyncio.wait_for(self._queue.get(), timeout=1.0)
+                    prio, seq_ts, payload = await asyncio.wait_for(self._queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
                     continue
 

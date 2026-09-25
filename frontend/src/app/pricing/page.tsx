@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { createCheckoutSession, verifyPayment } from '@/lib/api';
+import { createCheckoutSession, verifyPayment, fetchSubscriptionStatus } from '@/lib/api';
 import {
   Zap,
   CheckCircle2,
@@ -17,8 +17,8 @@ import {
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
-  const [currentPlan, setCurrentPlan] = useState<string>('STARTER');
-  const [creditsBalance, setCreditsBalance] = useState<number>(500);
+  const [currentPlan, setCurrentPlan] = useState<string>('FREE_TRIAL');
+  const [creditsBalance, setCreditsBalance] = useState<number>(50);
 
   // Modal State
   const [checkoutPlan, setCheckoutPlan] = useState<any | null>(null);
@@ -30,11 +30,10 @@ export default function PricingPage() {
   const [copiedVpa, setCopiedVpa] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/billing/subscription-status')
-      .then((res) => res.json())
+    fetchSubscriptionStatus()
       .then((data) => {
         if (data.plan_tier) setCurrentPlan(data.plan_tier);
-        if (data.credits_balance) setCreditsBalance(data.credits_balance);
+        if (data.credits_balance !== undefined) setCreditsBalance(data.credits_balance);
       })
       .catch(() => console.log('Using default subscription status'));
   }, []);
@@ -49,8 +48,7 @@ export default function PricingPage() {
         plan_tier: plan.id,
         billing_cycle: billingCycle,
         currency: currency,
-        gateway: 'UPI' as any,
-        user_id: 1
+        gateway: 'UPI' as any
       });
       setUpiData(session);
     } catch (err) {
@@ -69,8 +67,7 @@ export default function PricingPage() {
           plan_tier: checkoutPlan.id,
           billing_cycle: billingCycle,
           currency: currency,
-          gateway: 'UPI' as any,
-          user_id: 1
+          gateway: 'UPI' as any
         });
         setUpiData(session);
       } catch (err) {
@@ -93,8 +90,7 @@ export default function PricingPage() {
           currency: currency,
           gateway: 'UPI' as any,
           transaction_id: txnId,
-          amount: upiData?.amount || checkoutPlan.priceINR,
-          user_id: 1
+          amount: upiData?.amount || checkoutPlan.priceINR
         });
         setCheckoutSuccess(`🎉 ${verified.message} Valid until ${verified.valid_until}.`);
         setTimeout(() => {
@@ -107,8 +103,7 @@ export default function PricingPage() {
         plan_tier: checkoutPlan.id,
         billing_cycle: billingCycle,
         currency: currency,
-        gateway: 'RAZORPAY',
-        user_id: 1
+        gateway: 'RAZORPAY'
       });
 
       if (session.checkout_url) {
@@ -122,8 +117,7 @@ export default function PricingPage() {
         currency: currency,
         gateway: 'RAZORPAY',
         transaction_id: session.session_id || `tx_${Date.now()}`,
-        amount: session.amount,
-        user_id: 1
+        amount: session.amount
       });
 
       setCheckoutSuccess(`🎉 ${verified.message} Valid until ${verified.valid_until}.`);
