@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import { 
   Tv, 
@@ -19,6 +21,16 @@ import {
   Trash2
 } from 'lucide-react';
 import { YouTubeChannelItem, VisualMode } from '@/lib/types';
+import AuthGuard from '@/components/AuthGuard';
+import { 
+  fetchChannels as apiFetchChannels,
+  createChannel as apiCreateChannel,
+  updateChannelAutomation as apiUpdateAutomation,
+  toggleChannelAutomation as apiToggleAutomation,
+  deleteChannel as apiDeleteChannel,
+  fetchYouTubeAuthUrl,
+  fetchYouTubeChannel
+} from '@/lib/api';
 
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<YouTubeChannelItem[]>([]);
@@ -26,6 +38,9 @@ export default function ChannelsPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [editingChannel, setEditingChannel] = useState<YouTubeChannelItem | null>(null);
+  const [ytAuthUrl, setYtAuthUrl] = useState<string | null>(null);
+  const [ytChannelInfo, setYtChannelInfo] = useState<any | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Form state for adding/editing
   const [formName, setFormName] = useState('');
@@ -35,38 +50,43 @@ export default function ChannelsPage() {
   const [formVideosPerDay, setFormVideosPerDay] = useState(2);
   const [formPublishTimes, setFormPublishTimes] = useState('10:00, 18:00');
 
-  const fetchChannels = async () => {
+  const loadChannelsData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/channels');
-      if (res.ok) {
-        const data = await res.json();
-        setChannels(data);
-      }
-    } catch (err) {
+      setErrorMsg(null);
+      const data = await apiFetchChannels();
+      setChannels(data);
+
+      try {
+        const auth = await fetchYouTubeAuthUrl();
+        if (auth && auth.auth_url) setYtAuthUrl(auth.auth_url);
+      } catch (e) {}
+
+      try {
+        const info = await fetchYouTubeChannel();
+        if (info) setYtChannelInfo(info);
+      } catch (e) {}
+    } catch (err: any) {
       console.error('Failed to load channels:', err);
+      setErrorMsg(err.message || 'Failed to load channels');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchChannels();
+    loadChannelsData();
   }, []);
 
   const handleToggleAutomation = async (channel: YouTubeChannelItem) => {
     const isCurrentlyEnabled = channel.profile?.automation_enabled ?? true;
-    const endpoint = isCurrentlyEnabled ? 'pause' : 'resume';
+    const action = isCurrentlyEnabled ? 'pause' : 'resume';
     try {
       setActionLoading(channel.id);
-      const res = await fetch(`http://localhost:8000/api/v1/channels/${channel.id}/${endpoint}`, {
-        method: 'POST'
-      });
-      if (res.ok) {
-        await fetchChannels();
-      }
-    } catch (err) {
-      console.error(`Failed to ${endpoint} channel:`, err);
+      await apiToggleAutomation(channel.id, action);
+      await loadChannelsData();
+    } catch (err: any) {
+      alert(`Failed to ${action} channel: ${err.message}`);
     } finally {
       setActionLoading(null);
     }
@@ -74,27 +94,28 @@ export default function ChannelsPage() {
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formName.trim()) {
+      alert('Please enter a channel name');
+      return;
+    }
     try {
+      setActionLoading(-1);
       const times = formPublishTimes.split(',').map(t => t.trim()).filter(Boolean);
-      const res = await fetch('http://localhost:8000/api/v1/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel_name: formName,
-          niche: formNiche,
-          visual_mode: formVisualMode,
-          video_format: formVideoFormat,
-          videos_per_day: formVideosPerDay,
-          publish_times: times
-        })
+      await apiCreateChannel({
+        channel_name: formName.trim(),
+        niche: formNiche,
+        visual_mode: formVisualMode,
+        video_format: formVideoFormat,
+        videos_per_day: formVideosPerDay,
+        publish_times: times
       });
-      if (res.ok) {
-        setShowAddModal(false);
-        setFormName('');
-        await fetchChannels();
-      }
-    } catch (err) {
-      console.error('Failed to create channel:', err);
+      setShowAddModal(false);
+      setFormName('');
+      await loadChannelsData();
+    } catch (err: any) {
+      alert(`Failed to create channel: ${err.message}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -102,24 +123,34 @@ export default function ChannelsPage() {
     e.preventDefault();
     if (!editingChannel) return;
     try {
+      setActionLoading(editingChannel.id);
       const times = formPublishTimes.split(',').map(t => t.trim()).filter(Boolean);
-      const res = await fetch(`http://localhost:8000/api/v1/channels/${editingChannel.id}/automation`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          niche: formNiche,
-          visual_mode: formVisualMode,
-          video_format: formVideoFormat,
-          videos_per_day: formVideosPerDay,
-          publish_times: times
-        })
+      await apiUpdateAutomation(editingChannel.id, {
+        niche: formNiche,
+        visual_mode: formVisualMode,
+        video_format: formVideoFormat,
+        videos_per_day: formVideosPerDay,
+        publish_times: times
       });
-      if (res.ok) {
-        setEditingChannel(null);
-        await fetchChannels();
-      }
-    } catch (err) {
-      console.error('Failed to update automation:', err);
+      setEditingChannel(null);
+      await loadChannelsData();
+    } catch (err: any) {
+      alert(`Failed to update profile: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: number) => {
+    if (!confirm('Are you sure you want to remove this channel from AutoTube?')) return;
+    try {
+      setActionLoading(channelId);
+      await apiDeleteChannel(channelId);
+      await loadChannelsData();
+    } catch (err: any) {
+      alert(`Failed to delete channel: ${err.message}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -133,6 +164,7 @@ export default function ChannelsPage() {
   };
 
   return (
+    <AuthGuard>
     <div className="space-y-8 max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
@@ -160,10 +192,48 @@ export default function ChannelsPage() {
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/20 transition"
           >
-            <Plus className="w-4 h-4" /> Connect Channel
+            <Plus className="w-4 h-4" /> Create Channel Profile
           </button>
+
+          {ytAuthUrl && (
+            <a
+              href={ytAuthUrl}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm shadow-lg shadow-red-600/30 transition"
+            >
+              <Globe className="w-4 h-4" /> 🔴 Connect YouTube (Google OAuth)
+            </a>
+          )}
         </div>
       </div>
+
+      {/* Success Notification */}
+      {successNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-bold flex items-center justify-between">
+          <span>{successNotice}</span>
+          <button onClick={() => setSuccessNotice(null)} className="text-slate-400 hover:text-white">✕</button>
+        </div>
+      )}
+
+      {/* Top Google OAuth Callout Banner */}
+      {ytAuthUrl && (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-red-600/20 via-slate-900 to-indigo-600/20 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-lg shadow-red-600/30">
+              OAuth
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold text-white">Step 3: Connect Official YouTube Account via Google OAuth</h4>
+              <p className="text-xs text-slate-300">Authorize AutoTube AI to automatically upload 3D Pixar Shorts to your channel daily.</p>
+            </div>
+          </div>
+          <a
+            href={ytAuthUrl}
+            className="shrink-0 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs shadow-lg shadow-red-600/30 transition flex items-center gap-2"
+          >
+            <Globe className="w-4 h-4" /> Authorize Google / YouTube Channel →
+          </a>
+        </div>
+      )}
 
       {/* Channel Cards Grid */}
       {loading ? (
@@ -252,6 +322,18 @@ export default function ChannelsPage() {
                     </span>
                   </div>
                 </div>
+
+                {!ch.is_connected && ytAuthUrl && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-600/10 border border-red-500/30 flex items-center justify-between gap-2">
+                    <span className="text-xs text-red-300 font-bold">🔴 Pending YouTube OAuth Access</span>
+                    <a
+                      href={ytAuthUrl}
+                      className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-md shadow-red-600/30 transition flex items-center gap-1.5"
+                    >
+                      <Globe className="w-3.5 h-3.5" /> Connect Google OAuth →
+                    </a>
+                  </div>
+                )}
 
                 {/* Footer Controls */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
@@ -522,5 +604,6 @@ export default function ChannelsPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }
