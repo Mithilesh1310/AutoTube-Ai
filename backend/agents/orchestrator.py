@@ -326,6 +326,23 @@ async def run_single_pipeline(
         session.add(video_obj)
         await session.commit()
 
+    # Deduct credits & record backend usage ledger
+    try:
+        cost = cost_protection_service.estimate_job_cost(visual_mode=visual_mode, video_type=video_type)
+        await usage_ledger_service.record_usage(
+            user_id=user_id,
+            channel_id=channel_id,
+            job_id=job_id,
+            provider_name="AutoTube AI Pipeline",
+            model_name=visual_mode,
+            operation_type=f"VIDEO_PIPELINE_{video_type}",
+            estimated_cost=cost,
+            actual_cost=cost,
+            credits_used=cost
+        )
+    except Exception as err:
+        logger.warning(f"[MasterOrchestrator] Failed to record usage ledger / credit deduction: {err}")
+
     await update_job_status(job_id, "COMPLETED", "COMPLETED", 100.0)
     await log_job_step(job_id, "MasterOrchestrator", "SUCCESS", f"Successfully completed autonomous pipeline for {video_type} ({visual_mode}) video!")
     return state_dict
