@@ -365,39 +365,93 @@ async def run_pipeline(
 
     await log_job_step(job_id, "MasterOrchestrator", "INFO", f"Autonomous AutoTube Pipeline launched (Task: {task_type}, Mode: {visual_mode}).")
 
+    # Infer video format from channel automation profile if DAILY_WORKFLOW
+    target_format = "BOTH"
+    if channel_id:
+        async with AsyncSessionLocal() as session:
+            prof_res = await session.execute(
+                select(ChannelAutomationProfile).where(ChannelAutomationProfile.channel_id == channel_id)
+            )
+            prof = prof_res.scalar_one_or_none()
+            if prof and prof.video_format:
+                target_format = prof.video_format
+
     if task_type in ["DAILY_WORKFLOW", "BOTH"]:
-        logger.info(f"[MasterOrchestrator] Executing Daily Workflow for Channel #{channel_id}: 1 Short + 1 Long Video...")
-        short_res = await run_single_pipeline(
-            job_id=f"{job_id}_short",
-            video_type="SHORT",
-            local_test_only=local_test_only,
-            user_id=user_id,
-            channel_id=channel_id,
-            visual_mode=visual_mode,
-            parent_job_id=job_id
-        )
-        long_res = await run_single_pipeline(
-            job_id=f"{job_id}_long",
-            video_type="LONG",
-            local_test_only=local_test_only,
-            user_id=user_id,
-            channel_id=channel_id,
-            visual_mode=visual_mode,
-            parent_job_id=job_id
-        )
+        if target_format == "SHORT":
+            logger.info(f"[MasterOrchestrator] Executing Daily Workflow for Channel #{channel_id}: 1 Short Video (Format: SHORT)...")
+            short_res = await run_single_pipeline(
+                job_id=f"{job_id}_short",
+                video_type="SHORT",
+                local_test_only=local_test_only,
+                user_id=user_id,
+                channel_id=channel_id,
+                visual_mode=visual_mode,
+                parent_job_id=job_id
+            )
+            err = short_res.get("error")
+            if err:
+                await update_job_status(job_id, "FAILED", "FAILED", 100.0, err)
+                await log_job_step(job_id, "MasterOrchestrator", "ERROR", f"Daily Short Workflow completed with error: {err}")
+                return {"short": short_res, "error": err}
+            else:
+                await update_job_status(job_id, "COMPLETED", "COMPLETED", 100.0)
+                await log_job_step(job_id, "MasterOrchestrator", "SUCCESS", "Successfully completed autonomous Daily Short Workflow!")
+                return {"short": short_res}
 
-        short_err = short_res.get("error")
-        long_err = long_res.get("error")
+        elif target_format == "LONG":
+            logger.info(f"[MasterOrchestrator] Executing Daily Workflow for Channel #{channel_id}: 1 Long Video (Format: LONG)...")
+            long_res = await run_single_pipeline(
+                job_id=f"{job_id}_long",
+                video_type="LONG",
+                local_test_only=local_test_only,
+                user_id=user_id,
+                channel_id=channel_id,
+                visual_mode=visual_mode,
+                parent_job_id=job_id
+            )
+            err = long_res.get("error")
+            if err:
+                await update_job_status(job_id, "FAILED", "FAILED", 100.0, err)
+                await log_job_step(job_id, "MasterOrchestrator", "ERROR", f"Daily Long Workflow completed with error: {err}")
+                return {"long": long_res, "error": err}
+            else:
+                await update_job_status(job_id, "COMPLETED", "COMPLETED", 100.0)
+                await log_job_step(job_id, "MasterOrchestrator", "SUCCESS", "Successfully completed autonomous Daily Long Workflow!")
+                return {"long": long_res}
 
-        if short_err or long_err:
-            err_summary = f"Short: {short_err or 'OK'} | Long: {long_err or 'OK'}"
-            await update_job_status(job_id, "FAILED", "FAILED", 100.0, err_summary)
-            await log_job_step(job_id, "MasterOrchestrator", "ERROR", f"Daily Workflow completed with errors: {err_summary}")
-            return {"short": short_res, "long": long_res, "error": err_summary}
         else:
-            await update_job_status(job_id, "COMPLETED", "COMPLETED", 100.0)
-            await log_job_step(job_id, "MasterOrchestrator", "SUCCESS", "Successfully completed autonomous Daily Workflow (1 Short + 1 Long)!")
-            return {"short": short_res, "long": long_res}
+            logger.info(f"[MasterOrchestrator] Executing Daily Workflow for Channel #{channel_id}: 1 Short + 1 Long Video (Format: BOTH)...")
+            short_res = await run_single_pipeline(
+                job_id=f"{job_id}_short",
+                video_type="SHORT",
+                local_test_only=local_test_only,
+                user_id=user_id,
+                channel_id=channel_id,
+                visual_mode=visual_mode,
+                parent_job_id=job_id
+            )
+            long_res = await run_single_pipeline(
+                job_id=f"{job_id}_long",
+                video_type="LONG",
+                local_test_only=local_test_only,
+                user_id=user_id,
+                channel_id=channel_id,
+                visual_mode=visual_mode,
+                parent_job_id=job_id
+            )
+
+            short_err = short_res.get("error")
+            long_err = long_res.get("error")
+
+            if short_err or long_err:
+                err_summary = f"Short: {short_err or 'OK'} | Long: {long_err or 'OK'}"
+                await update_job_status(job_id, "FAILED", "FAILED", 100.0, err_summary)
+                await log_job_step(job_id, "MasterOrchestrator", "ERROR", f"Daily Workflow completed with errors: {err_summary}")
+                return {"short": short_res, "long": long_res, "error": err_summary}
+            else:
+                await update_job_status(job_id, "COMPLETED", "COMPLETED", 100.0)
+                await log_job_step(job_id, "MasterOrchestrator", "SUCCESS", "Successfully completed autonomous Daily Workflow (1 Short + 1 Long)!")
+                return {"short": short_res, "long": long_res}
     elif task_type == "SHORT":
         return await run_single_pipeline(job_id=job_id, video_type="SHORT", local_test_only=local_test_only, user_id=user_id, channel_id=channel_id, visual_mode=visual_mode)
     else:
