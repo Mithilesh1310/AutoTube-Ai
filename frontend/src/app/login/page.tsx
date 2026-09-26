@@ -69,8 +69,8 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="flex justify-center items-center gap-3 mb-4">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-11 h-11 rounded-2xl bg-neutral-900 flex items-center justify-center text-white shadow-xl shadow-neutral-900/10 group-hover:scale-105 transition-transform">
-              <Play className="w-5 h-5 fill-white" />
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-xl shadow-neutral-900/10 group-hover:scale-105 transition-transform bg-white border border-neutral-200 flex items-center justify-center">
+              <img src="/logo.png" alt="AutoTube AI Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <span className="text-xl font-bold tracking-tight text-neutral-900">AutoTube</span>

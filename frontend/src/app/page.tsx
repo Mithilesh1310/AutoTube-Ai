@@ -253,8 +253,8 @@ export default function SaaSMarketingLandingPage() {
       <div className="sticky top-4 z-50 max-w-5xl mx-auto px-4">
         <header className="bg-white/85 backdrop-blur-md border border-gray-200/80 rounded-full px-5 py-2.5 flex items-center justify-between shadow-xs transition-all">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white">
-              <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center">
+              <img src="/logo.png" alt="AutoTube AI Logo" className="w-full h-full object-cover" />
             </div>
             <span className="font-extrabold text-base text-gray-900 tracking-tight">AutoTube</span>
           </Link>
