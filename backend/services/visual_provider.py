@@ -77,7 +77,7 @@ class HuggingFaceImageProvider(ImageProvider):
 
         from huggingface_hub import InferenceClient
 
-        clean_prompt = prompt.replace("[", "").replace("]", "").strip()[:500]
+        clean_prompt = prompt.replace("[", "").replace("]", "").strip()
         client = InferenceClient(token=api_key)
 
         last_error = None
@@ -131,7 +131,7 @@ class PollinationsImageProvider(ImageProvider):
         if dir_name:
             os.makedirs(dir_name, exist_ok=True)
         clean_prompt = prompt.replace("[", "").replace("]", "").strip()
-        encoded_prompt = urllib.parse.quote(clean_prompt[:450])
+        encoded_prompt = urllib.parse.quote(clean_prompt)
         
         api_key = (settings.IMAGE_API_KEY or "").strip()
         headers = {}
@@ -141,10 +141,13 @@ class PollinationsImageProvider(ImageProvider):
         last_error = None
         for attempt in range(3):
             seed = random.randint(1000, 999999)
-            urls_to_try = []
+            urls_to_try = [
+                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true",
+                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=turbo&enhance=true&nologo=true",
+                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
+            ]
             if api_key:
-                urls_to_try.append(f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&model=flux&nologo=true")
-            urls_to_try.append(f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&nologo=true")
+                urls_to_try.insert(0, f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true")
 
             for url in urls_to_try:
                 try:

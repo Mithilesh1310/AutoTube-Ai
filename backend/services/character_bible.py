@@ -47,8 +47,65 @@ class CharacterBibleService:
         return CHARACTER_ALIASES.get(cleaned, cleaned)
 
     @staticmethod
+    async def resolve_character_ids_async(input_chars: Any, fallback: Optional[List[str]] = None) -> List[str]:
+        """Dynamically resolves characters against both static aliases and user-created custom DB characters."""
+        resolved = []
+        
+        # 1. Fetch custom characters from DB
+        db_chars = []
+        try:
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(select(Character))
+                db_chars = res.scalars().all()
+        except Exception:
+            pass
+
+        # Build dynamic lookup dict (name/id -> character_id)
+        dynamic_map = dict(CHARACTER_ALIASES)
+        for db_c in db_chars:
+            cid = db_c.character_id.lower()
+            name_lower = db_c.name.lower()
+            dynamic_map[cid] = cid
+            dynamic_map[name_lower] = cid
+            if db_c.species:
+                dynamic_map[db_c.species.lower()] = cid
+
+        if isinstance(input_chars, str):
+            text = input_chars.lower()
+            for alias, canon in dynamic_map.items():
+                if alias in text and canon not in resolved:
+                    resolved.append(canon)
+        elif isinstance(input_chars, (list, tuple, set)):
+            for item in input_chars:
+                if not item:
+                    continue
+                item_str = str(item).strip().lower()
+                canon = dynamic_map.get(item_str)
+                if canon:
+                    if canon not in resolved:
+                        resolved.append(canon)
+                else:
+                    matched = False
+                    for alias, c in dynamic_map.items():
+                        if alias in item_str:
+                            if c not in resolved:
+                                resolved.append(c)
+                            matched = True
+                            break
+                    if not matched and item_str not in ["narrator", "कथावाचक"]:
+                        if item_str not in resolved:
+                            resolved.append(item_str)
+
+        if not resolved:
+            # Pick latest DB character if available, else fallback
+            if db_chars:
+                return [db_chars[-1].character_id]
+            return fallback or ["chintu"]
+        return resolved
+
+    @staticmethod
     def resolve_character_ids(input_chars: Any, fallback: Optional[List[str]] = None) -> List[str]:
-        """Resolves any mix of Hindi/English names or text mentions into canonical character IDs."""
+        """Synchronous wrapper for static resolution."""
         resolved = []
         if isinstance(input_chars, str):
             text = input_chars.lower()
@@ -65,7 +122,6 @@ class CharacterBibleService:
                     if canon not in resolved:
                         resolved.append(canon)
                 else:
-                    # Check substring match for composite names
                     matched = False
                     for alias, c in CHARACTER_ALIASES.items():
                         if alias in item_str:
@@ -111,6 +167,12 @@ class CharacterBibleService:
             )
             c = result.scalar_one_or_none()
             if not c:
+                # Try search by name
+                res_name = await session.execute(
+                    select(Character).where(Character.name.ilike(f"%{character_id}%"))
+                )
+                c = res_name.scalar_one_or_none()
+            if not c:
                 return None
             return {
                 "character_id": c.character_id,
@@ -132,7 +194,7 @@ class CharacterBibleService:
         location: str = "magical cartoon forest with lush green canopy and glowing flowers"
     ) -> str:
         """Injects exact character physical descriptions, colors, and clothing for strict character consistency."""
-        canon_ids = CharacterBibleService.resolve_character_ids(character_ids)
+        canon_ids = await CharacterBibleService.resolve_character_ids_async(character_ids)
         char_tags = []
         for cid in canon_ids:
             char = await CharacterBibleService.get_character_by_id(cid)
@@ -141,51 +203,30 @@ class CharacterBibleService:
                 clothing = char.get("clothing", "")
                 palette = char.get("color_palette", "")
                 name = char.get("name", cid.capitalize())
-                species = char.get("species", "Animal")
-                base_prompt = char.get("visual_prompt_base", "")
+                species = char.get("species", "Character")
                 
                 # High-fidelity 3D Pixar character definitions with natural consistency
-                if cid == "chintu" or "chintu" in name.lower():
+                if cid == "chintu":
                     char_desc = (
                         f"Chintu (adorable cheerful 3D Disney Pixar cartoon boy with friendly warm smile, expressive big brown eyes, "
                         f"wearing {clothing or 'a vibrant blue kurta'}, accompanied by his cute little baby blue elephant friend, "
                         f"3D Pixar CGI animated style, vibrant cheerful lighting)"
                     )
-                elif species.lower() == "monkey" or cid == "momo":
-                    char_desc = (
-                        f"Momo (adorable 3D Pixar cartoon little monkey with warm golden-brown fur, playful curly tail, {desc}, "
-                        f"wearing {clothing or 'a tiny red vest'}, palette: {palette}, 3D animated Pixar character)"
-                    )
-                elif species.lower() == "rabbit" or cid == "titu":
-                    char_desc = (
-                        f"Titu (adorable 3D Pixar cartoon fluffy white bunny rabbit with upright ears and tiny round reading glasses, {desc}, "
-                        f"wearing {clothing or 'a cute little bowtie'}, palette: {palette}, 3D animated Pixar character)"
-                    )
-                elif species.lower() == "parrot" or cid == "mithu":
-                    char_desc = (
-                        f"Mithu (vibrant 3D Pixar cartoon green parrot bird with bright red beak, {desc}, "
-                        f"palette: {palette}, animated Pixar cartoon bird)"
-                    )
-                elif "turtle" in species.lower() or cid == "baba_turtle":
-                    char_desc = (
-                        f"Baba Turtle (wise friendly 3D Pixar cartoon green tortoise with patterned shell, {desc}, "
-                        f"palette: {palette}, animated cartoon turtle character)"
-                    )
                 else:
                     char_desc = (
-                        f"{name} (cute 3D Pixar animated cartoon {species}, {desc}, wearing {clothing}, palette: {palette}, "
-                        f"3D Disney Pixar studio render)"
+                        f"{name} (adorable 3D Pixar Disney animated character, {species}, {desc}, wearing {clothing}, "
+                        f"color palette: {palette}, expressive big sparkling eyes, 3D Pixar studio render)"
                     )
 
                 char_tags.append(char_desc)
 
-        chars_str = " and ".join(char_tags) if char_tags else "Chintu the adorable 3D Pixar baby blue cartoon elephant with cute trunk"
+        chars_str = " and ".join(char_tags) if char_tags else "Cute 3D Pixar animated main character"
         full_prompt = (
-            f"Pixar 3D Disney animation style, masterpiece, octane 3D render. "
-            f"{scene_description}. "
-            f"Featuring main characters: {chars_str}. "
-            f"Setting: {location}. "
-            f"Vibrant joyful colors, cinematic studio lighting, detailed fur and skin textures, expressive eyes, cute animated proportions, 8k resolution, photorealistic CGI cartoon render, no humans, no text."
+            f"Ultra high quality 8k 3D Pixar Disney animation style, masterpiece, octane 3D render, raytracing lighting. "
+            f"Scene: {scene_description}. "
+            f"Main Characters: {chars_str}. "
+            f"Environment: {location}. "
+            f"Vibrant cinematic lighting, highly detailed 3D textures, cute proportions, 8k resolution, crisp clear focus, masterpiece."
         )
         return full_prompt
 

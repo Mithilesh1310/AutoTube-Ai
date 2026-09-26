@@ -95,20 +95,20 @@ async def run_scene_director(state_dict: dict) -> dict:
 
         # 4. Identify Present Characters with Multi-Language Support
         line_combined_text = f"{speaker} {dialogue} {line.get('scene_reference', '')}"
-        detected_chars = character_bible.resolve_character_ids(line_combined_text, fallback=[])
+        detected_chars = await character_bible.resolve_character_ids_async(line_combined_text, fallback=[])
 
         # If speaker is a character, prioritize them in front
         if speaker.lower() not in ["narrator", "कथावाचक"]:
-            spk_chars = character_bible.resolve_character_ids([speaker], fallback=[])
+            spk_chars = await character_bible.resolve_character_ids_async([speaker], fallback=[])
             for sc in spk_chars:
                 if sc in detected_chars:
                     detected_chars.remove(sc)
                 detected_chars.insert(0, sc)
 
-        # Fallback to script characters or chintu
+        # Fallback to script characters or latest custom character
         if not detected_chars:
-            script_chars = script_data.get("characters", ["chintu"])
-            detected_chars = character_bible.resolve_character_ids(script_chars, fallback=["chintu"])
+            script_chars = script_data.get("characters", [])
+            detected_chars = await character_bible.resolve_character_ids_async(script_chars, fallback=[])
 
         chars_present = detected_chars
 
