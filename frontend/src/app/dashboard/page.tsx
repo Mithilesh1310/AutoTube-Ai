@@ -22,6 +22,7 @@ import {
   Tv, ShieldAlert, RotateCcw, Crown, Search, FileText,
   Palette, Mic, RefreshCw, ChevronRight, Check, Sparkles
 } from 'lucide-react';
+import AuthGuard from '@/components/AuthGuard';
 
 function getMediaUrl(path?: string, ytId?: string, isThumb = false): string {
   if (!path) {
@@ -160,6 +161,7 @@ export default function DashboardOverview() {
   const filteredVideos = videos.filter((v) => activeTab === 'ALL' || v.video_type === activeTab);
 
   return (
+    <AuthGuard>
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 space-y-6">
       {/* Toast Notice */}
       {actionNotice && (
@@ -517,7 +519,7 @@ export default function DashboardOverview() {
       {/* Video Modal Player */}
       {selectedVideo && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white border border-gray-200 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl relative">
+          <div className="bg-white border border-gray-200 rounded-3xl max-w-3xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-pink-100 text-pink-800">
@@ -542,7 +544,7 @@ export default function DashboardOverview() {
               />
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
               <span className="text-xs text-gray-500 font-medium">Created: {selectedVideo.created_at}</span>
               <div className="flex items-center gap-2">
                 {selectedVideo.video_path && (
@@ -570,5 +572,6 @@ export default function DashboardOverview() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

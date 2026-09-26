@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { fetchVideos } from '@/lib/api';
 import { VideoRecord } from '@/lib/types';
 import { Film, Youtube, Download, Play, Search, X, Sparkles } from 'lucide-react';
+import AuthGuard from '@/components/AuthGuard';
 
 function getMediaUrl(path?: string, ytId?: string, isThumb = false): string {
   if (!path) {
@@ -45,6 +46,7 @@ export default function VideosPage() {
   });
 
   return (
+    <AuthGuard>
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -177,7 +179,7 @@ export default function VideosPage() {
       {/* Video Modal Player */}
       {selectedVideo && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-3xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -204,7 +206,7 @@ export default function VideosPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
               <div className="text-xs text-slate-400">
                 Created: <span className="text-slate-200 font-medium">{selectedVideo.created_at}</span>
               </div>
@@ -234,6 +236,7 @@ export default function VideosPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }
 

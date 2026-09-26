@@ -33,7 +33,7 @@ const navItems = [
   { href: '/pricing', label: 'Pricing & Plans', icon: Zap },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -60,7 +60,7 @@ export default function Sidebar() {
     <aside className="w-64 bg-[#0F172A]/90 backdrop-blur-xl border-r border-slate-800/80 flex flex-col justify-between p-4 min-h-screen select-none">
       <div>
         {/* Brand Header */}
-        <Link href="/dashboard" className="flex items-center gap-3 px-2 py-3 mb-5 group">
+        <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-3 px-2 py-3 mb-5 group">
           <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-red-600/30 group-hover:scale-105 transition-transform bg-slate-900 border border-slate-800 flex items-center justify-center">
             <img src="/logo.png" alt="AutoTube AI Logo" className="w-full h-full object-cover" />
           </div>
@@ -84,6 +84,7 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   isActive
                     ? 'bg-red-500/10 text-red-400 border border-red-500/20 shadow-md shadow-red-500/5'

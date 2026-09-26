@@ -204,7 +204,7 @@ export default function ChannelsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={loadChannelsData}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
@@ -406,7 +406,7 @@ export default function ChannelsPage() {
       {/* Add Channel Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
               <Plus className="w-5 h-5 text-blue-400" /> Connect YouTube Channel
             </h2>
@@ -529,7 +529,7 @@ export default function ChannelsPage() {
       {/* Edit Profile Modal */}
       {editingChannel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
               <Settings2 className="w-5 h-5 text-indigo-400" /> Configure {editingChannel.channel_name}
             </h2>

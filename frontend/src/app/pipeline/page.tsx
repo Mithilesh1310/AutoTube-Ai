@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchJobs, triggerWorkflow, fetchChannels, retryJob } from '@/lib/api';
 import { JobRecord, YouTubeChannelItem, VisualMode } from '@/lib/types';
+import AuthGuard from '@/components/AuthGuard';
 import { 
   GitMerge, 
   Play, 
@@ -119,6 +120,7 @@ export default function PipelinePage() {
   const activeAgents = selectedVisualMode === 'FULL_ANIMATION' ? fullAnimationAgentsList : imageMotionAgentsList;
 
   return (
+    <AuthGuard>
     <div className="space-y-8 animate-in fade-in duration-300 pb-12 max-w-7xl mx-auto px-4">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-800 pb-6">
@@ -180,7 +182,7 @@ export default function PipelinePage() {
           </div>
 
           {/* Trigger Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => handleRun('SHORT')}
               disabled={runningType !== null}
@@ -208,7 +210,7 @@ export default function PipelinePage() {
       </div>
 
       {/* Active Pipeline Architecture Banner */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           <span className="font-bold text-white">Active Engine Architecture:</span>
           <span className={`px-2 py-0.5 rounded font-black text-[11px] ${
@@ -320,5 +322,6 @@ export default function PipelinePage() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }
