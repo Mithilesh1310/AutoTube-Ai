@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -18,6 +20,8 @@ import {
   Check
 } from 'lucide-react';
 import { YouTubeChannelItem, VisualMode } from '@/lib/types';
+import AuthGuard from '@/components/AuthGuard';
+import { fetchChannels as apiFetchChannels, updateChannelAutomation as apiUpdateAutomation } from '@/lib/api';
 
 export default function AutomationSetupWizard() {
   const router = useRouter();
@@ -39,12 +43,17 @@ export default function AutomationSetupWizard() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('http://localhost:8000/api/v1/channels');
-        if (res.ok) {
-          const data = await res.json();
-          setChannels(data);
-          if (data.length > 0) {
-            setSelectedChannelId(data[0].id);
+        const data = await apiFetchChannels();
+        setChannels(data);
+        if (data && data.length > 0) {
+          const selected = data[0];
+          setSelectedChannelId(selected.id);
+          if (selected.profile) {
+            if (selected.profile.niche) setNiche(selected.profile.niche);
+            if (selected.profile.visual_mode) setVisualMode(selected.profile.visual_mode);
+            if (selected.profile.video_format) setVideoFormat(selected.profile.video_format);
+            if (selected.profile.videos_per_day) setVideosPerDay(selected.profile.videos_per_day);
+            if (selected.profile.publish_times) setPublishTimes(selected.profile.publish_times);
           }
         }
       } catch (err) {
@@ -57,29 +66,26 @@ export default function AutomationSetupWizard() {
   }, []);
 
   const handleFinish = async () => {
-    if (!selectedChannelId) return;
+    if (!selectedChannelId) {
+      alert('Please select or create a YouTube channel first.');
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/channels/${selectedChannelId}/automation`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          niche,
-          visual_mode: visualMode,
-          video_format: videoFormat,
-          videos_per_day: videosPerDay,
-          publish_times: publishTimes,
-          automation_enabled: true,
-          auto_publish: true,
-          voice_style: voiceStyle,
-          character_universe: characterUniverse
-        })
+      await apiUpdateAutomation(selectedChannelId, {
+        niche,
+        visual_mode: visualMode,
+        video_format: videoFormat,
+        videos_per_day: videosPerDay,
+        publish_times: publishTimes,
+        automation_enabled: true,
+        auto_publish: true,
+        voice_style: voiceStyle,
+        character_universe: characterUniverse
       });
-      if (res.ok) {
-        router.push('/channels');
-      }
-    } catch (err) {
-      console.error('Failed to save automation profile:', err);
+      router.push('/channels');
+    } catch (err: any) {
+      alert(`Failed to save automation profile: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -96,6 +102,7 @@ export default function AutomationSetupWizard() {
   ];
 
   return (
+    <AuthGuard>
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8">
@@ -141,11 +148,48 @@ export default function AutomationSetupWizard() {
       <div className="rounded-2xl bg-slate-900/90 border border-slate-800/80 p-8 shadow-2xl backdrop-blur-xl">
         {/* Step 1: Select Channel */}
         {currentStep === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <Tv className="w-5 h-5 text-blue-400" /> Step 1: Select Target YouTube Channel
             </h3>
             <p className="text-xs text-slate-400">Choose which channel AutoTube should manage autonomously.</p>
+
+            {/* Active Automation Card for configured channels */}
+            {channels.find(c => c.id === selectedChannelId)?.profile?.automation_enabled && (
+              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wide">
+                    <CheckCircle2 className="w-4 h-4" /> Active Auto-Pilot Configured
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                    Live Status: Ready
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Niche Category</span>
+                    <span className="font-bold text-white">{niche}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Visual Engine</span>
+                    <span className="font-bold text-purple-300">{visualMode}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Format</span>
+                    <span className="font-bold text-blue-300">{videoFormat}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Daily Schedule</span>
+                    <span className="font-bold text-emerald-300">{videosPerDay} Videos ({publishTimes.join(', ')})</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 italic">
+                  Aapka automation already ACTIVE aur configured hai. Click "Next Step" below to modify or update any setting step-by-step.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {channels.map((ch) => (
@@ -160,7 +204,9 @@ export default function AutomationSetupWizard() {
                 >
                   <div className="font-bold text-sm">{ch.channel_name}</div>
                   <div className="text-xs text-slate-400 mt-1">{ch.profile?.niche || 'Kids Cartoon Stories'}</div>
-                  <div className="text-[10px] text-emerald-400 mt-2 font-medium">● Connected Account</div>
+                  <div className="text-[10px] text-emerald-400 mt-2 font-medium flex items-center gap-1">
+                    ● Connected Account {ch.profile?.automation_enabled && '(Auto-Pilot Active)'}
+                  </div>
                 </div>
               ))}
             </div>
@@ -427,5 +473,6 @@ export default function AutomationSetupWizard() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }
