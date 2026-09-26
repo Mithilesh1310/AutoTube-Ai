@@ -16,8 +16,8 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     daily_credit_limit = Column(Float, default=100.0)
     monthly_credit_limit = Column(Float, default=2000.0)
-    credits_balance = Column(Float, default=500.0)
-    plan_tier = Column(String(50), default="STARTER") # FREE_TRIAL, STARTER, PRO, AGENCY
+    credits_balance = Column(Float, default=50.0)
+    plan_tier = Column(String(50), default="FREE_TRIAL") # FREE_TRIAL, STARTER, PRO, AGENCY
     subscription_status = Column(String(50), default="ACTIVE") # ACTIVE, PAST_DUE, CANCELED, TRIAL
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
