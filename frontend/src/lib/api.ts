@@ -178,6 +178,27 @@ export async function fetchCharacters(): Promise<CharacterItem[]> {
   return res.json();
 }
 
+export async function createCharacter(data: {
+  name: string;
+  species: string;
+  personality: string;
+  physical_description: string;
+  clothing?: string;
+  color_palette?: string;
+  voice_id?: string;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/characters`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to create character');
+  }
+  return res.json();
+}
+
 export async function fetchJobs(channelId?: number): Promise<JobRecord[]> {
   const url = channelId ? `${API_BASE}/jobs?channel_id=${channelId}` : `${API_BASE}/jobs`;
   const res = await fetch(url, { headers: getAuthHeaders(), cache: 'no-store' });

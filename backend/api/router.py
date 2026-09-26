@@ -11,7 +11,7 @@ from backend.config import settings
 from backend.agents.orchestrator import run_pipeline
 from backend.services.character_bible import character_bible
 from backend.services.analytics_service import analytics_service
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user, get_admin_user
 
 logger = logging.getLogger(__name__)
 api_router = APIRouter(prefix="/api/v1")
@@ -191,6 +191,54 @@ async def get_video_detail(video_id: int, db: AsyncSession = Depends(get_db)):
 async def list_characters():
     return await character_bible.get_all_characters()
 
+@api_router.post("/characters")
+async def create_custom_character(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    name = payload.get("name", "").strip()
+    species = payload.get("species", "Cartoon Character").strip()
+    personality = payload.get("personality", "Friendly and adventurous").strip()
+    physical_description = payload.get("physical_description", f"Cute 3D Pixar style {name}").strip()
+    clothing = payload.get("clothing", "Colorful signature outfit").strip()
+    color_palette = payload.get("color_palette", "Vibrant 3D colors").strip()
+    voice_id = payload.get("voice_id", "hi-IN-SwaraNeural")
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Character name is required")
+        
+    cid = name.lower().replace(" ", "_")
+    cid_clean = "".join(c for c in cid if c.isalnum() or c == "_")
+    
+    # Check if character already exists
+    res = await db.execute(select(Character).where(Character.character_id == cid_clean))
+    if res.scalar_one_or_none():
+        cid_clean = f"{cid_clean}_{uuid.uuid4().hex[:4]}"
+        
+    char = Character(
+        user_id=current_user.id,
+        character_id=cid_clean,
+        name=name,
+        species=species,
+        personality=personality,
+        physical_description=physical_description,
+        clothing=clothing,
+        color_palette=color_palette,
+        visual_prompt_base=f"Cute 3D Pixar style {name} {species}, {physical_description}, wearing {clothing}",
+        negative_prompt="blurry, distorted, realistic human, ugly",
+        voice_config={"voice_id": voice_id, "pitch": "+0Hz", "rate": "+0%"}
+    )
+    db.add(char)
+    await db.commit()
+    await db.refresh(char)
+    return {
+        "status": "success",
+        "character_id": char.character_id,
+        "name": char.name,
+        "message": f"Custom character '{char.name}' created successfully!"
+    }
+
 @api_router.get("/jobs")
 async def list_jobs(
     channel_id: Optional[int] = None,
@@ -309,11 +357,11 @@ async def list_logs(job_id: Optional[str] = None, db: AsyncSession = Depends(get
     ]
 
 @api_router.get("/analytics")
-async def get_analytics_summary():
-    return await analytics_service.get_real_channel_analytics()
+async def get_analytics_summary(current_user: User = Depends(get_current_user)):
+    return await analytics_service.get_real_channel_analytics(user_id=current_user.id, is_admin=current_user.is_admin)
 
 @api_router.get("/settings")
-async def get_settings(db: AsyncSession = Depends(get_db)):
+async def get_settings(current_user: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Setting))
     settings_list = result.scalars().all()
     db_dict = {s.key: s.value for s in settings_list}
@@ -335,11 +383,12 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
         "YOUTUBE_CLIENT_ID": db_dict.get("YOUTUBE_CLIENT_ID") or settings.YOUTUBE_CLIENT_ID,
         "YOUTUBE_CLIENT_SECRET": db_dict.get("YOUTUBE_CLIENT_SECRET") or settings.YOUTUBE_CLIENT_SECRET,
         "YOUTUBE_REFRESH_TOKEN": db_dict.get("YOUTUBE_REFRESH_TOKEN") or settings.YOUTUBE_REFRESH_TOKEN,
+        "DEFAULT_UPI_ID": db_dict.get("DEFAULT_UPI_ID") or settings.DEFAULT_UPI_ID,
     }
     return merged
 
 @api_router.put("/settings")
-async def update_settings(payload: Dict[str, str], db: AsyncSession = Depends(get_db)):
+async def update_settings(payload: Dict[str, str], current_user: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
     for key, val in payload.items():
         result = await db.execute(select(Setting).where(Setting.key == key))
         existing = result.scalar_one_or_none()
@@ -367,6 +416,8 @@ async def update_settings(payload: Dict[str, str], db: AsyncSession = Depends(ge
             settings.YOUTUBE_CLIENT_SECRET = val.strip() if val else ""
         elif key == "GEMINI_API_KEY":
             settings.GEMINI_API_KEY = val.strip() if val else ""
+        elif key == "DEFAULT_UPI_ID":
+            settings.DEFAULT_UPI_ID = val.strip() if val else ""
     await db.commit()
     return {"status": "success", "message": "Settings updated."}
 
