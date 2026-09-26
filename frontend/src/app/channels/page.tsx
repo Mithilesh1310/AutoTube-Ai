@@ -568,12 +568,19 @@ export default function ChannelsPage() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">Niche Category</label>
-                <input
-                  type="text"
+                <select
                   value={formNiche}
                   onChange={(e) => setFormNiche(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm"
-                />
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-blue-500"
+                >
+                  <option value="Kids Cartoon Stories">Kids Cartoon Stories (3D Animation)</option>
+                  <option value="Hindi Moral Tales">Hindi Moral Tales & Panchatantra</option>
+                  <option value="Animal Adventures">Animal Adventures Universe</option>
+                  <option value="Kids Fun Rhymes">Kids Fun Rhymes & Learning</option>
+                  <option value="Mythology & Pauranik Tales">Mythology & Pauranik Kahaniyan</option>
+                  <option value="Sci-Fi & Space Adventures">Sci-Fi & Space Adventures</option>
+                  <option value="Trending AI Stories">Trending AI Stories & Myths</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
