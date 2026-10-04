@@ -16,7 +16,7 @@ class YouTubeService:
         description: str,
         tags: list,
         thumbnail_path: Optional[str] = None,
-        publish_mode: str = "UNLISTED",
+        publish_mode: str = "PUBLIC",
         is_made_for_kids: bool = True,
         channel_id: Optional[int] = None
     ) -> Dict[str, Any]:

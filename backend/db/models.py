@@ -210,7 +210,7 @@ class Video(Base):
     hashtags = Column(JSON, nullable=True)
     category_id = Column(String(20), default="15")
     is_made_for_kids = Column(Boolean, default=True)
-    publish_mode = Column(String(20), default="UNLISTED")
+    publish_mode = Column(String(20), default="PUBLIC")
     video_path = Column(Text, nullable=True)
     thumbnail_path = Column(Text, nullable=True)
     youtube_video_id = Column(String(100), nullable=True)

@@ -95,7 +95,7 @@ INITIAL_CHARACTERS = [
 
 INITIAL_SETTINGS = [
     {"key": "AGENT_ENABLED", "value": "true", "category": "general"},
-    {"key": "PUBLISH_MODE", "value": "UNLISTED", "category": "youtube"},
+    {"key": "PUBLISH_MODE", "value": "PUBLIC", "category": "youtube"},
     {"key": "VOICE_PROVIDER", "value": "edge_tts", "category": "voice"},
     {"key": "IMAGE_PROVIDER", "value": "huggingface", "category": "image"},
     {"key": "VISUAL_PROVIDER", "value": "image_kenburns", "category": "visual"},
