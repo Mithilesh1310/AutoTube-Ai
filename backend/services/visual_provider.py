@@ -74,7 +74,8 @@ class HuggingFaceImageProvider(ImageProvider):
         api_key = (settings.IMAGE_API_KEY or "").strip()
         hf_token = api_key if api_key.startswith("hf_") else None
         if not hf_token:
-            logger.info("[HuggingFace] IMAGE_API_KEY is not a valid HF token (must start with 'hf_'). Trying anonymous client / falling back...")
+            logger.info("[HuggingFace] IMAGE_API_KEY is not configured with a valid HF token (must start with 'hf_'). Skipping to Pollinations AI...")
+            raise ValueError("IMAGE_API_KEY is not configured with a valid HuggingFace token.")
 
         from huggingface_hub import InferenceClient
 
@@ -84,14 +85,16 @@ class HuggingFaceImageProvider(ImageProvider):
         last_error = None
         for model in self.models:
             try:
-                # Run synchronous client.text_to_image in async thread pool
-                img = await asyncio.to_thread(
-                    client.text_to_image,
-                    prompt=clean_prompt,
-                    model=model,
-                    width=width,
-                    height=height
-                )
+                def _fetch_hf_image():
+                    return client.text_to_image(
+                        prompt=clean_prompt,
+                        model=model,
+                        width=width,
+                        height=height
+                    )
+
+                # Run synchronous fetch in thread pool safely
+                img = await asyncio.to_thread(_fetch_hf_image)
 
                 if img and hasattr(img, "save"):
                     # Target aspect ratio upscale
@@ -116,7 +119,7 @@ class HuggingFaceImageProvider(ImageProvider):
                         is_fallback=False,
                         is_placeholder=False
                     )
-            except Exception as e:
+            except BaseException as e:
                 logger.warning(f"[HuggingFace] Model '{model}' failed: {e}. Trying next...")
                 last_error = e
 
