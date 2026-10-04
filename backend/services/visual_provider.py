@@ -72,13 +72,14 @@ class HuggingFaceImageProvider(ImageProvider):
         if dir_name:
             os.makedirs(dir_name, exist_ok=True)
         api_key = (settings.IMAGE_API_KEY or "").strip()
-        if not api_key or not api_key.startswith("hf_"):
-            raise ValueError("IMAGE_API_KEY is not configured with a valid HuggingFace token (must start with 'hf_').")
+        hf_token = api_key if api_key.startswith("hf_") else None
+        if not hf_token:
+            logger.info("[HuggingFace] IMAGE_API_KEY is not a valid HF token (must start with 'hf_'). Trying anonymous client / falling back...")
 
         from huggingface_hub import InferenceClient
 
         clean_prompt = prompt.replace("[", "").replace("]", "").strip()
-        client = InferenceClient(token=api_key)
+        client = InferenceClient(token=hf_token)
 
         last_error = None
         for model in self.models:
@@ -134,25 +135,33 @@ class PollinationsImageProvider(ImageProvider):
         encoded_prompt = urllib.parse.quote(clean_prompt)
         
         api_key = (settings.IMAGE_API_KEY or "").strip()
-        headers = {}
+        paid_headers = {}
         if api_key.startswith("sk_") or api_key.startswith("pk_"):
-            headers["Authorization"] = f"Bearer {api_key}"
+            paid_headers["Authorization"] = f"Bearer {api_key}"
 
         last_error = None
         for attempt in range(3):
             seed = random.randint(1000, 999999)
-            urls_to_try = [
-                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true",
-                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=turbo&enhance=true&nologo=true",
-                f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
-            ]
-            if api_key:
-                urls_to_try.insert(0, f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true")
+            
+            # List of (url, headers) tuples to attempt sequentially
+            requests_to_try = []
+            if api_key and paid_headers:
+                requests_to_try.append((
+                    f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true",
+                    paid_headers
+                ))
+            
+            # Public Pollinations endpoints MUST NOT send broken/depleted Authorization headers
+            requests_to_try.extend([
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true", {}),
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=turbo&enhance=true&nologo=true", {}),
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true", {})
+            ])
 
-            for url in urls_to_try:
+            for url, req_headers in requests_to_try:
                 try:
                     async with httpx.AsyncClient(timeout=45.0) as client:
-                        resp = await client.get(url, headers=headers)
+                        resp = await client.get(url, headers=req_headers)
                         if resp.status_code == 200 and len(resp.content) > 5000:
                             raw_img = Image.open(io.BytesIO(resp.content))
                             
@@ -175,6 +184,8 @@ class PollinationsImageProvider(ImageProvider):
                                 is_fallback=True,
                                 is_placeholder=False
                             )
+                        elif resp.status_code in (401, 402, 403):
+                            logger.warning(f"[Pollinations] Auth/Payment error ({resp.status_code}) for {url[:60]}. Trying next without auth...")
                         elif resp.status_code == 429:
                             logger.warning(f"[Pollinations] Rate limited (429). Retrying...")
                             await asyncio.sleep(2)
