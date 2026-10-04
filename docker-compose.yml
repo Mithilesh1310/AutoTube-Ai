@@ -35,6 +35,8 @@ services:
       - APP_ENV=production
       - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword123@postgres:5432/autotube
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - IMAGE_API_KEY=${IMAGE_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
       - SECRET_KEY=${SECRET_KEY:-autotube-v1-production-secret-98765}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_TZpxlk94xSaidY}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-bMOb4tz31ZSsdLtUkYyySdx8}
@@ -48,6 +50,7 @@ services:
       - BILLING_SANDBOX_MODE=false
     volumes:
       - autotube_storage:/app/storage
+      - ./backend:/app/backend
 
   frontend:
     build:
