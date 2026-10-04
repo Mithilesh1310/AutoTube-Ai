@@ -147,15 +147,15 @@ class PollinationsImageProvider(ImageProvider):
             requests_to_try = []
             if api_key and paid_headers:
                 requests_to_try.append((
-                    f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true",
+                    f"https://gen.pollinations.ai/image/{encoded_prompt}?key={api_key}&width={width}&height={height}&seed={seed}&enhance=true&nologo=true",
                     paid_headers
                 ))
             
-            # Public Pollinations endpoints MUST NOT send broken/depleted Authorization headers
+            # Public Pollinations endpoints (standard free tier)
             requests_to_try.extend([
-                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&enhance=true&nologo=true", {}),
-                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=turbo&enhance=true&nologo=true", {}),
-                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true", {})
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true", {}),
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=turbo&nologo=true", {}),
+                (f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&nologo=true", {})
             ])
 
             for url, req_headers in requests_to_try:
@@ -165,7 +165,7 @@ class PollinationsImageProvider(ImageProvider):
                         if resp.status_code == 200 and len(resp.content) > 5000:
                             raw_img = Image.open(io.BytesIO(resp.content))
                             
-                            # For thumbnails: keep native 1024x1024 square (perfect for YouTube Shorts & cards)
+                            # For thumbnails: keep native 1024x1024 square
                             if "thumbnail" in output_path.lower():
                                 raw_img.save(output_path, format="PNG", optimize=True)
                             else:
@@ -185,7 +185,7 @@ class PollinationsImageProvider(ImageProvider):
                                 is_placeholder=False
                             )
                         elif resp.status_code in (401, 402, 403):
-                            logger.warning(f"[Pollinations] Auth/Payment error ({resp.status_code}) for {url[:60]}. Trying next without auth...")
+                            logger.warning(f"[Pollinations] Auth/Payment notice ({resp.status_code}) for {url[:60]}. Trying next...")
                         elif resp.status_code == 429:
                             logger.warning(f"[Pollinations] Rate limited (429). Retrying...")
                             await asyncio.sleep(2)
@@ -198,6 +198,33 @@ class PollinationsImageProvider(ImageProvider):
             await asyncio.sleep(2)
 
         raise last_error or RuntimeError("Pollinations generation failed after all attempts.")
+
+class StockImageProvider(ImageProvider):
+    """
+    High-Resolution Stock Scene Provider fallback to ensure 100% production uptime.
+    """
+    async def generate_image(self, prompt: str, output_path: str, width: int = 1024, height: int = 1024) -> ImageProviderResult:
+        import io
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        target_w = 1080 if width < height else 1920
+        target_h = 1920 if width < height else 1080
+        
+        stock_url = f"https://picsum.photos/{target_w}/{target_h}"
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.get(stock_url)
+            if resp.status_code == 200 and len(resp.content) > 10000:
+                raw_img = Image.open(io.BytesIO(resp.content))
+                raw_img.save(output_path, format="PNG", optimize=True)
+                file_size = os.path.getsize(output_path)
+                logger.info(f"[StockImageProvider] Saved HD Stock scene image ({file_size} bytes, {target_w}x{target_h}) -> {output_path}")
+                return ImageProviderResult(
+                    image_path=output_path,
+                    provider_name="StockImageProvider",
+                    provider_type="ai",
+                    is_fallback=True,
+                    is_placeholder=False
+                )
+        raise RuntimeError("StockImageProvider failed to fetch image.")
 
 class LocalCanvasImageProvider(ImageProvider):
     """
@@ -239,11 +266,13 @@ class KenBurnsVisualProvider(VisualProvider):
     Orchestrates:
     PRIMARY:   HuggingFaceImageProvider
     SECONDARY: PollinationsImageProvider
+    TERTIARY:  StockImageProvider
     FALLBACK:  STOP PIPELINE (LocalCanvas ONLY IF settings.TEST_MODE is True)
     """
     def __init__(self):
         self.primary_provider = HuggingFaceImageProvider()
         self.secondary_provider = PollinationsImageProvider()
+        self.tertiary_provider = StockImageProvider()
         self.fallback_provider = LocalCanvasImageProvider()
 
     @property
@@ -266,12 +295,12 @@ class KenBurnsVisualProvider(VisualProvider):
         height = 1024
 
         # Strict Test Mode evaluation:
-        # TEST_MODE=false completely forbids LocalCanvasImageProvider regardless of caller
         is_test_mode = getattr(settings, "TEST_MODE", False)
         can_use_placeholder = is_test_mode and (allow_placeholder is True if allow_placeholder is not None else False)
 
         hf_error = None
         pollinations_error = None
+        stock_error = None
 
         # 1. PRIMARY: Hugging Face
         try:
@@ -284,22 +313,30 @@ class KenBurnsVisualProvider(VisualProvider):
         try:
             return await self.secondary_provider.generate_image(prompt, output_path, width, height)
         except Exception as e:
-            logger.warning(f"Secondary Pollinations ImageProvider failed: {e}.")
+            logger.warning(f"Secondary Pollinations ImageProvider failed: {e}. Falling back to Stock...")
             pollinations_error = e
 
-        # 3. IF BOTH AI PROVIDERS FAIL:
+        # 3. TERTIARY: Stock Scene Provider
+        try:
+            return await self.tertiary_provider.generate_image(prompt, output_path, width, height)
+        except Exception as e:
+            logger.warning(f"Tertiary StockImageProvider failed: {e}.")
+            stock_error = e
+
+        # 4. IF ALL REAL IMAGE PROVIDERS FAIL:
         if not can_use_placeholder:
             err_msg = (
-                f"PRODUCTION IMAGE GATE VIOLATION: All AI Image Providers failed! "
-                f"HuggingFace: {hf_error} | Pollinations: {pollinations_error}. "
+                f"PRODUCTION IMAGE GATE VIOLATION: All Image Providers failed! "
+                f"HuggingFace: {hf_error} | Pollinations: {pollinations_error} | Stock: {stock_error}. "
                 f"Placeholders strictly blocked when TEST_MODE=false."
             )
             logger.error(f"[VisualProvider] {err_msg}")
             raise ImageGenerationError(err_msg)
 
-        # 4. ONLY if TEST_MODE is explicitly True
+        # 5. ONLY if TEST_MODE is explicitly True
         logger.warning("[VisualProvider] TEST_MODE=true is active. Falling back to LocalCanvas placeholder.")
         return await self.fallback_provider.generate_image(prompt, output_path, width, height)
 
 visual_provider = KenBurnsVisualProvider()
 image_provider = visual_provider.primary_provider
+

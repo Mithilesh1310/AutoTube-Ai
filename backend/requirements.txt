@@ -24,3 +24,5 @@ langgraph>=0.0.26
 langchain-core>=0.1.30
 python-multipart>=0.0.9
 python-dotenv>=1.0.1
+huggingface_hub>=0.20.0
+
