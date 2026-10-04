@@ -62,6 +62,9 @@ class YouTubeChannel(Base):
     def refresh_token_encrypted(self, val):
         self.encrypted_refresh_token = val
 
+# Alias for backward compatibility
+Channel = YouTubeChannel
+
     @property
     def name(self):
         return self.channel_name

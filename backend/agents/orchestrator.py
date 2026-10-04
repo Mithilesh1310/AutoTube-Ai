@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Any, Optional
 from sqlalchemy import select, update
 from backend.db.session import AsyncSessionLocal
-from backend.db.models import Job, JobLog, Video, Script, Scene, Setting
+from backend.db.models import Job, JobLog, Video, Script, Scene, Setting, ChannelAutomationProfile
 from backend.config import settings
 from backend.services.visual_provider import ImageGenerationError
 from backend.services.animation_provider import AnimationGenerationError, animation_provider_manager
