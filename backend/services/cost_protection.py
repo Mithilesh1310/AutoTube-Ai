@@ -25,20 +25,15 @@ class CostProtectionService:
         scene_count: Optional[int] = None,
         retry_allowance_pct: float = 0.20
     ) -> float:
-        """Calculates estimated cost in USD based on generation mode and length with retry allowance."""
-        if scene_count is None:
-            scene_count = 5 if video_type == "SHORT" else 15
-
+        """Calculates credit deduction based on video format and visual mode (1 Short = 1 Credit, 1 Long = 5 Credits)."""
         if visual_mode == "IMAGE_MOTION":
-            base = scene_count * 0.005
+            credit_cost = 1.0 if video_type == "SHORT" else 5.0
         elif visual_mode in ["FULL_ANIMATION", "HYBRID"]:
-            base = scene_count * 0.05
+            credit_cost = 3.0 if video_type == "SHORT" else 10.0
         else: # AUTO
-            base = scene_count * 0.04
+            credit_cost = 2.0 if video_type == "SHORT" else 7.0
 
-        # Add buffer for QA retries (20%)
-        total_estimate = base * (1.0 + retry_allowance_pct)
-        return round(total_estimate, 4)
+        return round(credit_cost, 2)
 
     @staticmethod
     async def validate_user_spending(

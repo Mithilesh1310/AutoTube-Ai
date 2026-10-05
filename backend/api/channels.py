@@ -34,7 +34,7 @@ class CreateChannelRequest(BaseModel):
     visual_mode: Optional[str] = "FULL_ANIMATION"
     video_format: Optional[str] = "BOTH"
     videos_per_day: Optional[int] = 2
-    publish_times: Optional[List[str]] = ["10:00", "18:00"]
+    publish_times: Optional[List[str]] = ["09:00", "18:00"]
 
 @channels_router.get("")
 async def list_user_channels(
@@ -71,7 +71,7 @@ async def list_user_channels(
                 "visual_mode": profile.visual_mode if profile else "FULL_ANIMATION",
                 "video_format": profile.video_format if profile else "BOTH",
                 "videos_per_day": profile.videos_per_day if profile else 2,
-                "publish_times": profile.publish_times if profile else ["10:00", "18:00"],
+                "publish_times": profile.publish_times if profile else ["09:00", "18:00"],
                 "automation_enabled": profile.automation_enabled if profile else True,
                 "auto_publish": profile.auto_publish if profile else True,
                 "voice_style": profile.voice_style if profile else "hi-IN-SwaraNeural",

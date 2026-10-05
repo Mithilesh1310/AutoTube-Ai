@@ -86,7 +86,7 @@ class ChannelAutomationProfile(Base):
     visual_mode = Column(String(50), default="FULL_ANIMATION") # IMAGE_MOTION, FULL_ANIMATION, HYBRID, AUTO
     video_format = Column(String(20), default="SHORT") # SHORT, LONG, BOTH
     videos_per_day = Column(Integer, default=2)
-    publish_times = Column(JSON, default=["10:00", "18:00"]) # Array of HH:MM strings
+    publish_times = Column(JSON, default=["09:00", "18:00"]) # Array of HH:MM strings
     automation_enabled = Column(Boolean, default=True)
     auto_publish = Column(Boolean, default=True)
     voice_style = Column(String(50), default="hi-IN-SwaraNeural")

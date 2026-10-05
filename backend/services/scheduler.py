@@ -86,9 +86,17 @@ class MultiChannelScheduler:
                     continue
 
                 # 2. Check scheduled times
-                publish_times = profile.publish_times or ["10:00", "18:00"]
+                publish_times = profile.publish_times or ["09:00", "10:00", "18:00"]
                 for slot in publish_times:
-                    if slot == current_time_str:
+                    try:
+                        slot_hour, slot_min = map(int, slot.split(":"))
+                        now_hour, now_min = channel_now.hour, channel_now.minute
+                        diff_mins = abs((now_hour * 60 + now_min) - (slot_hour * 60 + slot_min))
+                        is_slot_match = (diff_mins <= 1)
+                    except Exception:
+                        is_slot_match = (slot == current_time_str)
+
+                    if is_slot_match:
                         # 3. Minimum gap between uploads check
                         min_gap_hours = profile.minimum_gap_between_uploads_hours or 4
                         latest_vid_res = await session.execute(
